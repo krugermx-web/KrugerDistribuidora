@@ -296,6 +296,10 @@
 
                 // 3. Ocultamos el botón de pagar y dibujamos el Brick de Mercado Pago
                 btn.classList.add('hidden');
+                // Limpiar cualquier botón previo para que no se amontonen
+document.getElementById('wallet_container').innerHTML = '';
+
+
                 
                 const bricksBuilder = mp.bricks();
                 bricksBuilder.create("wallet", "wallet_container", {
