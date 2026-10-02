@@ -305,9 +305,10 @@
                 const bricksBuilder = mp.bricks();
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: {
-                        amount: totalAmount,
+                        amount: totalAmount, // <--- Este número debe ser mayor a 0 (ej. 10 o 50)
                         preferenceId: preference.id,
                     },
+                    // ... resto de configuraciones ...
                     customization: {
                         paymentMethods: {
                             ticket: "all", // Permite Oxxo
