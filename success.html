@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>¡Pago Exitoso! | Tienda Krüger</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    <!-- Librería PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Outfit', 'sans-serif'] },
+                    colors: {
+                        'metallic-blue': '#002855',
+                        'metallic-red': '#D31145'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #F8F9FA; }
+        
+        /* Animación suave y compatible con el PDF */
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .animate-pop { 
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; 
+        }
+
+        /* Forzar impresión impecable del bloque */
+        .pdf-export-mode {
+            width: 800px !important;
+            max-width: 800px !important;
+            margin: 0 auto !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-[#F8F9FA] to-gray-200 min-h-screen flex flex-col justify-center items-center py-10 px-4">
+    
+    <!-- CONTENEDOR PRINCIPAL DEL RECIBO -->
+    <div id="recibo-html" class="p-8 md:p-12 rounded-3xl shadow-xl w-full max-w-xl bg-white border-t-8 border-green-500 mx-auto transition-all duration-300">
+        
+        <!-- LOGO -->
+        <div class="text-center mb-8">
+            <img src="./logo-kruger.png" alt="Krüger" class="h-14 mx-auto mb-2 object-contain" onerror="this.src='https://placehold.co/240x60/transparent/002855?text=Krüger'">
+            <p class="text-xs text-gray-500 font-bold tracking-widest uppercase">Distribuidor Autorizado</p>
+        </div>
+
+        <!-- PALOMITA FIJA CON ANIMACIÓN COMPATIBLE -->
+        <div class="text-center mb-6 animate-pop">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full">
+                <i class="fas fa-check-circle text-green-500 text-[60px] bg-white rounded-full"></i>
+            </div>
+        </div>
+        
+        <h1 class="text-3xl font-black text-center text-gray-900 mb-2">¡Pago Aprobado!</h1>
+        <p class="text-center text-gray-500 mb-10 font-medium">Hemos recibido tu orden y ya la estamos preparando.</p>
+        
+        <div class="bg-[#F8F9FA] border border-gray-200 rounded-xl p-8 mb-6">
+            <h3 class="font-bold text-metallic-blue border-b border-gray-300 pb-3 mb-5 uppercase tracking-wider text-sm"><i class="fas fa-receipt mr-2"></i> Resumen de Compra</h3>
+            
+            <div class="space-y-5">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 text-sm font-bold uppercase">Estado:</span>
+                    <span class="text-green-700 font-black text-sm uppercase"><i class="fas fa-check-circle mr-1"></i> Pagado</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 text-sm font-bold uppercase">Fecha:</span>
+                    <span id="r-date" class="text-gray-900 font-bold text-sm">...</span>
+                </div>
+                <div class="flex flex-col border-b border-gray-100 pb-3">
+                    <span class="text-gray-500 text-sm font-bold uppercase mb-1">Correo Electrónico:</span>
+                    <span id="r-email" class="text-gray-900 font-bold text-sm">...</span>
+                </div>
+                <div class="pt-3 flex justify-between items-center">
+                    <span class="text-gray-900 font-black text-lg uppercase tracking-wider">Total:</span>
+                    <span class="text-3xl font-black text-metallic-red">$<span id="r-total">...</span> MXN</span>
+                </div>
+            </div>
+        </div>
+        
+        <p class="text-xs text-gray-400 text-center font-bold tracking-widest mt-8 uppercase">Este documento es válido como comprobante</p>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN -->
+    <div class="mt-8 flex flex-col sm:flex-row gap-4 max-w-xl w-full">
+        <button id="btn-descargar" onclick="descargarPDF()" class="bg-metallic-red hover:bg-red-800 text-white font-bold py-4 px-6 rounded-2xl flex-1 flex items-center justify-center transition-all shadow-lg shadow-red-500/30 transform hover:-translate-y-1">
+            <i class="fas fa-file-pdf mr-2 text-xl"></i> Descargar Voucher
+        </button>
+        <a href="index.html" class="bg-metallic-blue hover:bg-blue-900 text-white font-bold py-4 px-6 rounded-2xl flex-1 flex items-center justify-center transition-all shadow-lg shadow-blue-900/30 transform hover:-translate-y-1">
+            <i class="fas fa-home mr-2 text-xl"></i> Volver a Inicio
+        </a>
+    </div>
+
+    <script>
+        // Imprimir la fecha
+        const hoy = new Date();
+        const fechaFormateada = hoy.toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+        document.getElementById('r-date').innerText = fechaFormateada;
+
+        // Cargar datos del carrito guardado
+        const ordenData = JSON.parse(localStorage.getItem("ordenKruger"));
+        if (ordenData) {
+            document.getElementById('r-email').innerText = ordenData.email || 'No proporcionado';
+            document.getElementById('r-total').innerText = ordenData.total ? ordenData.total.toLocaleString('es-MX') : '0';
+        }
+
+        // ================= FUNCIÓN DE DESCARGA PDF =================
+        function descargarPDF() {
+            const btn = document.getElementById('btn-descargar');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2 text-xl"></i> Generando PDF...';
+            btn.disabled = true;
+
+            const elemento = document.getElementById('recibo-html');
+            
+            // Forzamos el ancho a tamaño escritorio para el PDF
+            elemento.classList.add('pdf-export-mode');
+
+            const opciones = {
+                margin:       0.5,
+                filename:     'Voucher_Compra_Kruger.pdf',
+                image:        { type: 'jpeg', quality: 1.0 },
+                html2canvas:  { 
+                    scale: 2, 
+                    useCORS: true,
+                    letterRendering: true
+                },
+                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            
+            // Generamos PDF y restauramos el ancho normal
+            html2pdf().set(opciones).from(elemento).save().then(() => {
+                elemento.classList.remove('pdf-export-mode'); // Regresamos el diseño a la normalidad
+                btn.innerHTML = '<i class="fas fa-file-pdf mr-2 text-xl"></i> Descargar Voucher';
+                btn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
