@@ -303,7 +303,7 @@
             });
         }
 
-        // ================= FINALIZAR ORDEN Y PAGO =================
+      // ================= FINALIZAR ORDEN Y PAGO =================
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-process-order');
@@ -318,7 +318,7 @@
             
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
-            // NUEVO: Agregamos el correo a la base de datos
+            // PREPARAMOS LOS DATOS PERO AÚN NO LOS GUARDAMOS EN LA BASE DE DATOS
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
@@ -329,13 +329,11 @@
                 installSchedule: needsInstall ? document.getElementById('c-schedule').value : "",
                 items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0 })),
                 total: totalAmount,
-                status: "Pendiente",
                 createdAt: new Date()
             };
 
             try {
-                const ordenGuardada = await addDoc(collection(db, "orders"), orderData);
-                
+                // Creamos la preferencia de Mercado Pago
                 const responsePref = await fetch("https://servidor-kruger.onrender.com/create_preference", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -343,29 +341,18 @@
                 });
 
                 const preference = await responsePref.json();
-
                 btn.classList.add('hidden'); 
 
                 const cleanAmount = Number(totalAmount);
-                
                 const bricksBuilder = mp.bricks();
+                
                 bricksBuilder.create("payment", "wallet_container", {
-                    initialization: {
-                        amount: cleanAmount, 
-                        preferenceId: preference.id,
-                    },
+                    initialization: { amount: cleanAmount, preferenceId: preference.id },
                     customization: {
-                        paymentMethods: {
-                            // ticket: "all", // <- Eliminado OXXO/Efectivo
-                            creditCard: "all", 
-                            debitCard: "all", 
-                            mercadoPago: "all",
-                        },
+                        paymentMethods: { creditCard: "all", debitCard: "all", mercadoPago: "all" },
                     },
                     callbacks: {
-                        onReady: () => {
-                            console.log("Formulario de tarjeta cargado.");
-                        },
+                        onReady: () => { console.log("Formulario de tarjeta cargado."); },
                         onSubmit: ({ selectedPaymentMethod, formData }) => {
                             formData.ordenKruger = orderData;
                             return new Promise((resolve, reject) => {
@@ -375,7 +362,7 @@
                                     body: JSON.stringify(formData),
                                 })
                                 .then((response) => response.json())
-                                .then((response) => {
+                                .then(async (response) => {
                                     resolve(); 
 
                                     if (response.error) {
@@ -383,13 +370,12 @@
                                         return;
                                     }
 
-                                    // REDIRECCIONES A PÁGINAS NUEVAS Y GUARDADO DE PDF
+                                    // AHORA SÍ: SI EL PAGO PASÓ, GUARDAMOS EN FIREBASE
                                     if (response.status === "approved") {
-                                        updateDoc(doc(db, "orders", ordenGuardada.id), {
-    status: "Pagado",
-    mp_payment_id: response.id
-});
-                                        // Guardar los datos para el PDF
+                                        orderData.status = "Pagado";
+                                        orderData.mp_payment_id = response.id;
+                                        await addDoc(collection(db, "orders"), orderData);
+
                                         localStorage.setItem("ordenKruger", JSON.stringify({
                                             email: orderData.customerEmail,
                                             total: cleanAmount,
@@ -397,15 +383,12 @@
                                         }));
                                         
                                         cart = []; 
-                                        updateCart();
-                                        window.location.href = "success.html"; // Mandamos a la página exitosa
+                                        window.location.href = "success.html"; 
                                     } else if (response.status === "in_process") {
-                                        alert("Tu pago está siendo revisado por el banco. Te avisaremos en breve.");
+                                        alert("Tu pago está siendo revisado por el banco.");
                                         window.location.href = "success.html";
                                     } else if (response.status === "rejected") {
-                                        window.location.href = "error.html"; // Mandamos a la página de error
-                                    } else {
-                                        alert("Estado del pago: " + response.status);
+                                        window.location.href = "error.html"; 
                                     }
                                 })
                                 .catch((error) => {
@@ -414,9 +397,7 @@
                                 });
                             });
                         },
-                        onError: (error) => {
-                            console.error("Error en Brick:", error);
-                        },
+                        onError: (error) => { console.error("Error en Brick:", error); },
                     },
                 });
 
