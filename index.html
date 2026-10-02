@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Krüger | Calentadores de Agua - Distribuidor Autorizado</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
+    
+    <!-- SDK DE MERCADO PAGO -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        'metallic-blue': '#002855',
+                        'metallic-red': '#D31145',
+                        'metallic-silver': '#E8ECEF'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #F8F9FA; }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 8px 32px 0 rgba(0, 40, 85, 0.05);
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCSdcopQjbZoYwcgwjB8uhosN-yY11kMdQ",
+            authDomain: "tienda-kruger.firebaseapp.com",
+            projectId: "tienda-kruger",
+            storageBucket: "tienda-kruger.firebasestorage.app",
+            messagingSenderId: "675310203131",
+            appId: "1:675310203131:web:aaec21767633143169805e"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Inicializar Mercado Pago
+        const mp = new MercadoPago('APP_USR-89f69c3e-3705-4788-bf0a-dd9abc5bab1b', { locale: 'es-MX' });
+
+        let products = [];
+        let cart = [];
+        let currentActiveProduct = null;
+
+        const productsGrid = document.getElementById('products-grid');
+        const cartCount = document.getElementById('cart-count');
+        const cartModal = document.getElementById('cart-modal');
+        const cartItemsList = document.getElementById('cart-items');
+        const cartTotal = document.getElementById('cart-total');
+        const checkoutModal = document.getElementById('checkout-modal');
+        const finalTotal = document.getElementById('final-total');
+        const detailModal = document.getElementById('product-detail-modal');
+
+        onSnapshot(collection(db, "products"), (snapshot) => {
+            products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            renderProducts();
+        });
+
+        function renderProducts() {
+            if (products.length === 0) {
+                productsGrid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-medium">Sincronizando inventario con nuestros almacenes...</div>`;
+                return;
+            }
+            productsGrid.innerHTML = products.map(product => `
+                <div class="glass-card rounded-3xl overflow-hidden group hover:shadow-[0_20px_40px_rgba(0,40,85,0.1)] transition-all duration-300 relative">
+                    
+                    <!-- BADGE ENVÍO GRATIS -->
+                    <div class="absolute top-4 right-4 bg-green-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg z-10 flex items-center gap-1">
+                        <i class="fas fa-truck-fast"></i> Envío Gratis
+                    </div>
+
+                    <div onclick="openProductDetail('${product.id}')" class="relative h-72 overflow-hidden bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-8 cursor-pointer">
+                        <img src="${product.image}" alt="${product.name}" class="object-contain w-full h-full group-hover:scale-110 transition-transform duration-500 drop-shadow-2xl">
+                        <span class="absolute top-4 left-4 bg-metallic-red text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md">${product.type}</span>
+                    </div>
+                    <div class="p-8">
+                        <h3 class="text-2xl font-bold text-metallic-blue mb-2">${product.name}</h3>
+                        <p class="text-3xl font-black text-gray-900 mb-6">$${product.price.toLocaleString('es-MX')} <span class="text-base font-medium text-gray-500">MXN</span></p>
+                        
+                        <!-- Casilla de Instalación Rápida -->
+                        ${(product.installPrice && product.installPrice > 0) ? `
+                            <div class="mb-4 bg-white/50 p-3 rounded-xl border border-gray-100">
+                                <label class="flex items-center gap-3 cursor-pointer">
+                                    <input type="checkbox" id="install-${product.id}" class="w-5 h-5 text-metallic-blue rounded border-gray-300">
+                                    <span class="text-sm text-gray-600 font-medium">Instalación León <strong class="text-metallic-red">+$${product.installPrice.toLocaleString('es-MX')}</strong></span>
+                                </label>
+                            </div>
+                        ` : ''}
+
+                        <button onclick="addToCart('${product.id}')" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-semibold py-4 rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 shadow-lg shadow-blue-900/20 transform hover:-translate-y-1">
+                            Agregar al carrito
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // ================= MODAL DE DETALLE Y FICHA TÉCNICA =================
+        window.openProductDetail = (id) => {
+            currentActiveProduct = products.find(p => p.id === id);
+            const p = currentActiveProduct;
+            
+            document.getElementById('detail-name').innerText = p.name;
+            document.getElementById('detail-price').innerText = `$${p.price.toLocaleString('es-MX')} MXN`;
+            document.getElementById('detail-desc').innerText = p.description || "Calentador Krüger con ingeniería alemana de máxima eficiencia y ahorro de gas comprobado. Construcción reforzada para larga durabilidad y tecnología de temperatura constante.";
+            document.getElementById('detail-main-img').src = p.image;
+
+            const installContainer = document.getElementById('detail-install-container');
+            if(p.installPrice > 0) {
+                installContainer.innerHTML = `
+                    <div class="mt-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" id="detail-install-check" class="mt-1 w-5 h-5 text-metallic-blue rounded border-gray-300">
+                            <span class="text-sm text-gray-700 font-medium">
+                                Agregar Instalación Certificada (León, Gto) <br>
+                                <strong class="text-metallic-red text-base">+$${p.installPrice.toLocaleString('es-MX')} MXN</strong>
+                            </span>
+                        </label>
+                    </div>
+                `;
+            } else {
+                installContainer.innerHTML = '';
+            }
+
+            detailModal.classList.remove('hidden');
+        };
+
+        window.closeProductDetail = () => { detailModal.classList.add('hidden'); currentActiveProduct = null; };
+
+        window.addDetailToCart = () => {
+            const p = currentActiveProduct;
+            const installCheck = document.getElementById('detail-install-check');
+            const wantsInstall = installCheck ? installCheck.checked : false;
+            
+            const cartItemId = p.id + (wantsInstall ? '-with-install' : '');
+            const existing = cart.find(item => item.cartItemId === cartItemId);
+            
+            if (existing) existing.quantity++;
+            else cart.push({ ...p, cartItemId, quantity: 1, wantsInstall });
+            
+            updateCart();
+            closeProductDetail();
+            openCart();
+        };
+
+        // ================= LÓGICA DEL CARRITO =================
+        window.addToCart = (id) => {
+            const product = products.find(p => p.id === id);
+            const installCheck = document.getElementById(`install-${id}`);
+            const wantsInstall = installCheck ? installCheck.checked : false;
+            
+            const cartItemId = id + (wantsInstall ? '-with-install' : '');
+            const existingItem = cart.find(item => item.cartItemId === cartItemId);
+            
+            if (existingItem) existingItem.quantity++;
+            else cart.push({ ...product, cartItemId, quantity: 1, wantsInstall });
+            
+            if(installCheck) installCheck.checked = false;
+            updateCart();
+            openCart();
+        };
+
+        window.removeFromCart = (cartItemId) => {
+            cart = cart.filter(item => item.cartItemId !== cartItemId);
+            updateCart();
+        };
+
+        function updateCart() {
+            cartCount.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
+            
+            const total = cart.reduce((sum, item) => {
+                let itemTotal = item.price;
+                if(item.wantsInstall && item.installPrice) itemTotal += item.installPrice;
+                return sum + (itemTotal * item.quantity);
+            }, 0);
+
+            cartTotal.innerText = `$${total.toLocaleString('es-MX')}`;
+            finalTotal.innerText = `$${total.toLocaleString('es-MX')} MXN`;
+
+            if (cart.length === 0) {
+                cartItemsList.innerHTML = `<p class="text-gray-500 text-center py-10">Tu carrito está vacío</p>`;
+            } else {
+                cartItemsList.innerHTML = cart.map(item => `
+                    <div class="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm mb-4 border border-gray-50 relative">
+                        <img src="${item.image}" class="w-16 h-16 object-contain rounded-xl bg-gray-50 p-2">
+                        <div class="flex-1 pr-6">
+                            <h4 class="font-bold text-gray-800 text-sm mb-1">${item.name}</h4>
+                            <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>
+                            ${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
+                            <span class="text-xs text-gray-500">Cant: ${item.quantity}</span>
+                        </div>
+                        <button onclick="removeFromCart('${item.cartItemId}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        window.openCart = () => cartModal.classList.remove('translate-x-full');
+        window.closeCart = () => cartModal.classList.add('translate-x-full');
+        
+        window.openCheckout = () => {
+            if(cart.length === 0) return alert("Tu carrito está vacío");
+            
+            const needsInstall = cart.some(item => item.wantsInstall);
+            if(needsInstall) {
+                document.getElementById('installation-fields').classList.remove('hidden');
+                document.getElementById('c-schedule').setAttribute('required', 'true');
+            } else {
+                document.getElementById('installation-fields').classList.add('hidden');
+                document.getElementById('c-schedule').removeAttribute('required');
+            }
+
+            closeCart();
+            checkoutModal.classList.remove('hidden');
+        };
+        
+        window.closeCheckout = () => checkoutModal.classList.add('hidden');
+
+        document.getElementById('c-same-address').addEventListener('change', (e) => {
+            const el = document.getElementById('c-install-address');
+            if(e.target.checked) {
+                el.classList.add('hidden');
+                el.removeAttribute('required');
+            } else {
+                el.classList.remove('hidden');
+                el.setAttribute('required', 'true');
+            }
+        });
+
+        // ================= ENVIAR PEDIDO =================
+        // ================= FINALIZAR ORDEN CON MERCADO PAGO LOCAL =================
+        document.getElementById('checkout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-process-order');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Conectando con el banco...';
+            btn.disabled = true;
+
+            const needsInstall = cart.some(i => i.wantsInstall);
+            const shippingAddress = document.getElementById('c-address').value;
+            const finalInstallAddress = needsInstall ? (document.getElementById('c-same-address').checked ? shippingAddress : document.getElementById('c-install-address').value) : "";
+            
+            const orderData = {
+                customerName: document.getElementById('c-name').value,
+                customerPhone: document.getElementById('c-phone').value,
+                shippingAddress: shippingAddress,
+                needsInstall: needsInstall,
+                installAddress: finalInstallAddress,
+                installSchedule: needsInstall ? document.getElementById('c-schedule').value : "",
+                items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0 })),
+                total: cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0),
+                status: "Pendiente",
+                createdAt: new Date()
+            };
+
+            try {
+                // 1. Guardamos la orden en Firebase
+                await addDoc(collection(db, "orders"), orderData);
+                
+                // 2. Pedimos autorización a TU SERVIDOR LOCAL (El de la terminal negra)
+                const response = await fetch("https://servidor-kruger.onrender.com/create_preference", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ items: orderData.items })
+                });
+
+                const preference = await response.json();
+
+                // 3. Ocultamos el botón de pagar y dibujamos el Brick de Mercado Pago
+                btn.classList.add('hidden');
+                
+                const bricksBuilder = mp.bricks();
+                bricksBuilder.create("wallet", "wallet_container", {
+                    initialization: {
+                        preferenceId: preference.id,
+                    },
+                    customization: {
+                        texts: {
+                            valueProp: 'security_safety',
+                        },
+                    },
+                });
+
+            } catch(error) { 
+                alert("Error de conexión con el servidor: " + error.message); 
+                console.error(error);
+                btn.innerHTML = '<i class="fas fa-lock mr-2"></i> Pagar de Forma Segura'; 
+                btn.disabled = false;
+            } 
+        });
+    </script>
+</head>
+<body class="bg-[#F8F9FA] text-gray-800 antialiased overflow-x-hidden">
+
+    <nav class="fixed w-full z-40 top-0 glass-nav transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-20 items-center">
+                <div class="flex flex-col">
+                    <div class="flex items-center">
+                        <img src="./logo-kruger.png" alt="Krüger" class="h-8 md:h-10 w-auto object-contain" onerror="this.onerror=null; this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
+                    </div>
+                    <span class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-1">Distribuidor Autorizado</span>
+                </div>
+                
+                <div class="hidden md:flex space-x-8">
+                    <a href="#calidad" class="text-sm font-bold text-gray-600 hover:text-metallic-blue transition-colors">Ingeniería Alemana</a>
+                    <a href="#tecnologia" class="text-sm font-bold text-gray-600 hover:text-metallic-blue transition-colors">Línea Silver</a>
+                    <a href="#catalogo" class="text-sm font-bold text-gray-600 hover:text-metallic-blue transition-colors">Catálogo</a>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <button onclick="openCart()" class="relative p-2 text-metallic-blue hover:bg-gray-100 rounded-full transition-colors">
+                        <i class="fas fa-shopping-bag text-xl"></i>
+                        <span id="cart-count" class="absolute top-0 right-0 bg-metallic-red text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center transform translate-x-1 -translate-y-1 shadow-md">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="relative pt-20 pb-32 bg-gradient-to-br from-metallic-blue via-[#001530] to-black overflow-hidden">
+        <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] mix-blend-overlay"></div>
+        <div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-metallic-blue rounded-full filter blur-[120px] opacity-50 mix-blend-screen"></div>
+        
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 pt-24 pb-12">
+            <div class="text-center max-w-4xl mx-auto">
+                <span class="inline-block py-1 px-3 rounded-full bg-white/10 text-white text-xs font-bold tracking-widest mb-6 border border-white/20">MÁS DE 30 AÑOS DE EXPERIENCIA</span>
+                <h1 class="text-5xl md:text-7xl font-black text-white tracking-tight mb-6 drop-shadow-2xl">
+                    El confort de la <span class="text-transparent bg-clip-text bg-gradient-to-r from-metallic-red to-red-400">tecnología alemana</span> en tu hogar
+                </h1>
+                <p class="text-xl text-gray-300 mb-10 font-light max-w-2xl mx-auto">
+                    Ahorro de gas inigualable, temperatura constante y durabilidad extrema garantizada. Descubre por qué somos los líderes absolutos en calentadores.
+                </p>
+                <div class="flex justify-center gap-4">
+                    <a href="#catalogo" class="bg-gradient-to-r from-metallic-red to-red-600 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 px-8 rounded-full text-lg transition-all shadow-lg shadow-red-500/30 transform hover:-translate-y-1">
+                        Ver Modelos
+                    </a>
+                    <a href="#calidad" class="bg-white/10 hover:bg-white/20 border border-white/30 text-white font-bold py-4 px-8 rounded-full text-lg transition-all">
+                        Nuestra Calidad
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="absolute bottom-0 w-full overflow-hidden leading-[0]">
+            <svg class="relative block w-full h-[60px] md:h-[100px]" viewBox="0 0 1440 100" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0,50 C360,100 1080,0 1440,50 L1440,100 L0,100 Z" fill="#FFFFFF"></path>
+            </svg>
+        </div>
+    </div>
+
+    <section id="calidad" class="bg-white py-24 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl font-black text-metallic-blue mb-4">Ingeniería que Trasciende</h2>
+                <div class="h-1.5 w-24 bg-metallic-red mx-auto rounded-full mb-6"></div>
+                <p class="text-lg text-gray-600 max-w-3xl mx-auto">
+                    Krüger no solo calienta agua, protege tu inversión. Nuestros equipos están construidos con estándares europeos para soportar las condiciones de agua más exigentes de México.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                <div class="bg-gray-50 rounded-3xl p-8 border border-gray-100 hover:shadow-xl transition-shadow text-center">
+                    <div class="w-20 h-20 mx-auto bg-blue-100 text-metallic-blue rounded-full flex items-center justify-center text-3xl mb-6 shadow-inner">
+                        <i class="fas fa-medal"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Años de Liderazgo</h3>
+                    <p class="text-gray-600 text-sm leading-relaxed">
+                        Con décadas de presencia sólida en el mercado, hemos perfeccionado el arte del calentamiento de agua.
+                    </p>
+                </div>
+
+                <div class="bg-gray-50 rounded-3xl p-8 border border-gray-100 hover:shadow-xl transition-shadow text-center relative overflow-hidden">
+                    <div class="absolute top-0 right-0 bg-metallic-red text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">NO SE PICAN</div>
+                    <div class="w-20 h-20 mx-auto bg-gray-200 text-gray-600 rounded-full flex items-center justify-center text-3xl mb-6 shadow-inner border-2 border-gray-300">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Materiales Anticorrosión</h3>
+                    <p class="text-gray-600 text-sm leading-relaxed">
+                        Utilizamos aleaciones premium que resisten aguas duras. <strong>Nuestros tanques y tuberías no se pican.</strong>
+                    </p>
+                </div>
+
+                <div class="bg-gray-50 rounded-3xl p-8 border border-gray-100 hover:shadow-xl transition-shadow text-center">
+                    <div class="w-20 h-20 mx-auto bg-red-100 text-metallic-red rounded-full flex items-center justify-center text-3xl mb-6 shadow-inner">
+                        <i class="fas fa-lock"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-gray-900 mb-3">Máxima Seguridad</h3>
+                    <p class="text-gray-600 text-sm leading-relaxed">
+                        Equipados con múltiples sensores de flama, termostatos y válvulas de alivio de presión exactas.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 w-full overflow-hidden leading-[0]">
+            <svg class="relative block w-full h-[60px] md:h-[100px]" viewBox="0 0 1440 100" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M0,50 C360,0 1080,100 1440,50 L1440,100 L0,100 Z" fill="#F8F9FA"></path>
+            </svg>
+        </div>
+    </section>
+
+    <section id="tecnologia" class="bg-[#F8F9FA] py-24 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                
+                <div>
+                    <span class="text-metallic-red font-black tracking-widest uppercase text-sm mb-2 block">La Nueva Era</span>
+                    <h2 class="text-4xl md:text-5xl font-black text-metallic-blue mb-6 leading-tight">Conoce la espectacular <br>Línea <span class="bg-clip-text text-transparent bg-gradient-to-r from-gray-400 to-gray-600">Silver</span></h2>
+                    
+                    <p class="text-lg text-gray-600 mb-8">
+                        La tecnología Silver de Krüger representa el pináculo de la eficiencia energética y el confort digital. Diseñada para hogares modernos que exigen lo mejor.
+                    </p>
+
+                    <div class="space-y-6">
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 rounded-full bg-white shadow flex items-center justify-center text-metallic-blue text-xl border border-gray-100">
+                                <i class="fas fa-microchip"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-gray-900">Microprocesador Inteligente</h4>
+                                <p class="text-gray-600 text-sm mt-1">Garantiza una <strong>temperatura constante e ininterrumpida</strong> sin cambios bruscos.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 rounded-full bg-white shadow flex items-center justify-center text-metallic-blue text-xl border border-gray-100">
+                                <i class="fas fa-tv"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-gray-900">Display Digital a Color</h4>
+                                <p class="text-gray-600 text-sm mt-1">Control absoluto en tus manos. Monitorea y ajusta la temperatura grado a grado.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-12 h-12 rounded-full bg-white shadow flex items-center justify-center text-metallic-red text-xl border border-gray-100">
+                                <i class="fas fa-fire-alt"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xl font-bold text-gray-900">Hasta 80% Ahorro de Gas</h4>
+                                <p class="text-gray-600 text-sm mt-1">El sistema modulante y la ausencia de piloto encendido te permiten ahorrar drásticamente.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="relative">
+                    <div class="absolute inset-0 bg-gradient-to-tr from-metallic-blue to-transparent rounded-3xl transform rotate-3 scale-105 opacity-10"></div>
+                    <div class="bg-white p-8 md:p-10 rounded-3xl shadow-2xl relative z-10 border border-gray-100">
+                        <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center text-3xl mb-6">
+                            <i class="fas fa-sun"></i>
+                        </div>
+                        <h3 class="text-3xl font-black text-gray-900 mb-4">Interconectable con<br>Calentadores Solares</h3>
+                        <p class="text-gray-600 mb-6 leading-relaxed">
+                            Nuestros equipos de última generación están preparados para el futuro. Son <strong>híbridos</strong>, pueden trabajar en perfecta sincronía con tu equipo solar existente.
+                        </p>
+                        <div class="bg-gray-50 p-5 rounded-2xl border border-gray-100">
+                            <h4 class="font-bold text-metallic-blue mb-2 text-sm uppercase tracking-wide">¿Cómo funciona?</h4>
+                            <p class="text-sm text-gray-600">
+                                Si el sol ya calentó el agua, el Krüger se mantiene apagado. Si en días nublados el agua viene tibia, el calentador Krüger <strong>solo enciende la flama necesaria</strong>.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <main id="catalogo" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-20">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-5xl font-black text-metallic-blue mb-4">Elige tu Krüger</h2>
+            <div class="h-1.5 w-24 bg-gradient-to-r from-metallic-red to-red-400 mx-auto rounded-full"></div>
+            <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest"><i class="fas fa-truck text-green-500 mr-1"></i> Envío Gratis a Todo México</p>
+        </div>
+        
+        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+            <!-- Productos inyectados desde Firestore por JS -->
+        </div>
+    </main>
+
+    <!-- NUEVO: MODAL DE DETALLE Y FICHA TÉCNICA -->
+    <div id="product-detail-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 md:p-10 backdrop-blur-md overflow-y-auto">
+        <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl relative flex flex-col md:flex-row overflow-hidden my-auto">
+            <button onclick="closeProductDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-metallic-red bg-white rounded-full p-2 z-10 shadow-sm"><i class="fas fa-times text-xl"></i></button>
+            
+            <!-- Izquierda: Galería -->
+            <div class="md:w-1/2 bg-gray-50 p-8 flex flex-col border-r border-gray-100">
+                <div class="self-start bg-green-100 text-green-700 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <i class="fas fa-truck-fast"></i> Envío Gratis a domicilio
+                </div>
+                <div class="flex-1 min-h-[300px] flex items-center justify-center mb-6 bg-white rounded-2xl p-6 shadow-inner">
+                    <img id="detail-main-img" src="" class="object-contain w-full h-full max-h-[400px] drop-shadow-xl transition-all">
+                </div>
+            </div>
+
+            <!-- Derecha: Información del Producto -->
+            <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
+                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Tecnología Alemana</span>
+                <h2 id="detail-name" class="text-3xl md:text-4xl font-black text-metallic-blue mb-4 leading-tight">Modelo</h2>
+                
+                <p id="detail-price" class="text-4xl font-black text-gray-900 mb-6">$0 MXN</p>
+                
+                <div class="flex items-center gap-4 mb-6 text-sm">
+                    <div class="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-2 rounded-lg border border-green-100"><i class="fas fa-box-open"></i> En stock</div>
+                    <div class="flex items-center gap-2 text-gray-600 font-medium"><i class="fas fa-bolt text-yellow-500"></i> Entrega: 2 a 5 días</div>
+                </div>
+
+                <div class="mb-8">
+                    <h4 class="font-bold text-gray-900 mb-2 border-b pb-2">Acerca del equipo</h4>
+                    <p id="detail-desc" class="text-gray-600 text-sm leading-relaxed"></p>
+                </div>
+
+                <div id="detail-install-container" class="mb-6"></div>
+
+                <button onclick="addDetailToCart()" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-blue-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                    <i class="fas fa-cart-plus"></i> Agregar al Pedido
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL CARRITO -->
+    <div id="cart-modal" class="fixed inset-y-0 right-0 w-full max-w-md bg-[#F8F9FA] shadow-2xl z-50 transform translate-x-full transition-transform duration-500 ease-out flex flex-col border-l border-gray-200">
+        <div class="p-6 bg-white border-b border-gray-100 flex justify-between items-center">
+            <h2 class="text-2xl font-black text-metallic-blue">Tu Pedido</h2>
+            <button onclick="closeCart()" class="text-gray-400 hover:text-metallic-red transition-colors bg-gray-50 p-2 rounded-full">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+        <div class="p-8 bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgb(0,0,0,0.05)]">
+            <div class="flex justify-between text-xl font-bold mb-6 text-metallic-blue">
+                <span>Total estimado:</span>
+                <span id="cart-total" class="text-2xl">$0</span>
+            </div>
+            <button onclick="openCheckout()" class="w-full bg-gradient-to-r from-metallic-red to-red-600 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-red-500/30 transform hover:-translate-y-1">
+                Finalizar Compra
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL CHECKOUT -->
+    <div id="checkout-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
+        <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl">
+            
+            <div class="bg-gray-50 p-8 md:p-10 md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-xl font-black text-metallic-blue mb-4">Resumen</h3>
+                    <div class="text-4xl font-black text-gray-900 mb-6" id="final-total">$0 MXN</div>
+                    
+                    <div class="bg-green-100 text-green-800 text-sm font-bold p-3 rounded-lg mb-6 flex items-center gap-2">
+                        <i class="fas fa-check-circle"></i> Envío nacional Gratis
+                    </div>
+                </div>
+                <button type="button" onclick="closeCheckout()" class="text-sm text-gray-500 font-bold hover:text-metallic-red text-left">
+                    <i class="fas fa-arrow-left mr-1"></i> Volver al carrito
+                </button>
+            </div>
+
+            <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto">
+                <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos de envío</h3>
+                
+                <form id="checkout-form" class="space-y-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Completo</label>
+                            <input type="text" id="c-name" required class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Teléfono Móvil</label>
+                            <input type="tel" id="c-phone" required class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Dirección de Envío Completa</label>
+                        <input type="text" id="c-address" required placeholder="Calle, Número, Colonia, Municipio, C.P." class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                    </div>
+
+                    <!-- SECCIÓN DINÁMICA DE INSTALACIÓN -->
+                    <div id="installation-fields" class="hidden bg-blue-50/50 p-6 rounded-2xl border border-blue-100 mt-4">
+                        <h4 class="text-sm font-bold text-metallic-blue mb-4"><i class="fas fa-tools mr-1"></i> Detalles de Instalación (León, Gto)</h4>
+                        
+                        <label class="flex items-center gap-2 mb-4 cursor-pointer">
+                            <input type="checkbox" id="c-same-address" checked class="w-4 h-4 text-metallic-blue">
+                            <span class="text-sm text-gray-700 font-medium">Instalar en la misma dirección de envío</span>
+                        </label>
+                        
+                        <input type="text" id="c-install-address" placeholder="Escribe la dirección de instalación diferente" class="hidden mb-4 w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                        
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Horarios Disponibles para Visita</label>
+                            <input type="text" id="c-schedule" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                            <p class="text-xs text-metallic-red mt-2 font-bold"><i class="fas fa-info-circle mr-1"></i> Confirmaremos el horario exacto por teléfono.</p>
+                        </div>
+                    </div>
+
+                    <button type="submit" id="btn-process-order" class="w-full bg-[#009EE3] hover:bg-blue-600 text-white font-black py-4 rounded-2xl text-lg shadow-lg flex justify-center items-center gap-2 mt-4 transition-colors">
+                        <i class="fas fa-lock"></i> Proceder al Pago Seguro
+                    </button>
+
+                    <!-- CONTENEDOR MERCADO PAGO BRICKS -->
+                    <div id="wallet_container" class="mt-4"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-metallic-blue text-gray-300 py-12 border-t border-blue-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center md:text-left grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div>
+                <img src="./logo-kruger-blanco.png" alt="Krüger" class="h-8 md:h-10 w-auto object-contain mb-4 mx-auto md:mx-0" onerror="this.onerror=null; this.src='https://placehold.co/200x50/transparent/ffffff?text=Krüger';">
+                <p class="text-sm text-blue-200 mt-4">Distribuidor Autorizado. Llevando la mejor tecnología alemana y el confort absoluto a cada hogar en México.</p>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-4 uppercase text-sm tracking-wider">Enlaces Rápidos</h4>
+                <ul class="space-y-2 text-sm">
+                    <li><a href="#calidad" class="hover:text-white">Nuestra Calidad</a></li>
+                    <li><a href="#tecnologia" class="hover:text-white">Tecnología Silver</a></li>
+                    <li><a href="#catalogo" class="hover:text-white">Catálogo Premium</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-4 uppercase text-sm tracking-wider">Soporte</h4>
+                <p class="text-sm mb-2"><i class="fas fa-phone mr-2"></i> 800-123-KRÜGER</p>
+                <p class="text-sm"><i class="fas fa-envelope mr-2"></i> ventas@kruger-distribuidor.mx</p>
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
