@@ -320,10 +320,9 @@
                         onReady: () => {
                             console.log("Formulario de tarjeta cargado.");
                         },
-                        onSubmit: ({ selectedPaymentMethod, formData }) => {
-                            // Cuando el cliente pone los números y le da a pagar
+                       onSubmit: ({ selectedPaymentMethod, formData }) => {
                             return new Promise((resolve, reject) => {
-                                // 3. CAMBIA ESTA URL POR LA TUYA DE RENDER (A la nueva ruta /process_payment)
+                                // CAMBIA LA URL POR LA TUYA DE RENDER
                                 fetch("https://servidor-kruger.onrender.com/process_payment", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
@@ -331,15 +330,34 @@
                                 })
                                 .then((response) => response.json())
                                 .then((response) => {
-                                    resolve(); // Esto hace que el Brick muestre una "palomita verde" de éxito
-                                    if(response.status === "approved") {
-                                        // Aquí puedes vaciar el carrito si lo deseas
-                                        cart = [];
+                                    resolve(); // Detiene la animación del botón
+
+                                    // Si el servidor marca error de conexión
+                                    if (response.error) {
+                                        alert("No se pudo procesar: " + response.error);
+                                        return;
+                                    }
+
+                                    // Evaluamos la respuesta oficial del banco
+                                    if (response.status === "approved") {
+                                        alert("¡Pago exitoso! Tu pedido ha sido confirmado.");
+                                        cart = []; // Vaciamos el carrito
                                         updateCart();
+                                        // Recargamos la página para limpiarla
+                                        window.location.reload(); 
+                                    } else if (response.status === "in_process") {
+                                        alert("Tu pago está siendo revisado por el banco. Te avisaremos en breve.");
+                                        window.location.reload();
+                                    } else if (response.status === "rejected") {
+                                        // Mercado pago detalla por qué lo rechazó (ej. fondos insuficientes, declinado)
+                                        alert("El banco rechazó el pago. Por favor intenta con otra tarjeta.");
+                                    } else {
+                                        alert("Estado del pago: " + response.status);
                                     }
                                 })
                                 .catch((error) => {
-                                    reject(); // Muestra error visual en el Brick
+                                    reject(); // Si falla el internet
+                                    alert("Error de red al intentar procesar el pago.");
                                 });
                             });
                         },
