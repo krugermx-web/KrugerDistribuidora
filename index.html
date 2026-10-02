@@ -334,7 +334,7 @@
             };
 
             try {
-                await addDoc(collection(db, "orders"), orderData);
+                const ordenGuardada = await addDoc(collection(db, "orders"), orderData);
                 
                 const responsePref = await fetch("https://servidor-kruger.onrender.com/create_preference", {
                     method: "POST",
@@ -385,6 +385,10 @@
 
                                     // REDIRECCIONES A PÁGINAS NUEVAS Y GUARDADO DE PDF
                                     if (response.status === "approved") {
+                                        updateDoc(doc(db, "orders", ordenGuardada.id), {
+    status: "Pagado",
+    mp_payment_id: response.id
+});
                                         // Guardar los datos para el PDF
                                         localStorage.setItem("ordenKruger", JSON.stringify({
                                             email: orderData.customerEmail,
