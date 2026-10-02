@@ -246,26 +246,70 @@
         window.closeCheckout = () => checkoutModal.classList.add('hidden');
 
         document.getElementById('c-same-address').addEventListener('change', (e) => {
-            const el = document.getElementById('c-install-address');
+            const el = document.getElementById('c-install-address-container'); // Cambiado a contenedor
+            const input = document.getElementById('c-install-address');
             if(e.target.checked) {
                 el.classList.add('hidden');
-                el.removeAttribute('required');
+                input.removeAttribute('required');
             } else {
                 el.classList.remove('hidden');
-                el.setAttribute('required', 'true');
+                input.setAttribute('required', 'true');
             }
         });
 
-        // ================= ENVIAR PEDIDO =================
-        // ================= FINALIZAR ORDEN CON MERCADO PAGO LOCAL =================
-        // ================= FINALIZAR ORDEN CON PAYMENT BRICK (FORMULARIO DIRECTO) =================
+        // ================= BUSCADOR AUTOCOMPLETADO (Tipo Rappi) =================
+        function setupAutocomplete(inputId, listId) {
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+            let timeout = null;
+
+            input.addEventListener('input', function() {
+                clearTimeout(timeout);
+                const query = this.value;
+                if (query.length < 5) {
+                    list.classList.add('hidden');
+                    return;
+                }
+                
+                timeout = setTimeout(() => {
+                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&limit=5`)
+                        .then(res => res.json())
+                        .then(data => {
+                            list.innerHTML = '';
+                            if (data.length > 0) {
+                                data.forEach(item => {
+                                    const li = document.createElement('li');
+                                    li.className = 'p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-sm text-gray-700 flex items-start gap-2';
+                                    li.innerHTML = `<i class="fas fa-map-marker-alt text-metallic-red mt-1"></i> <span>${item.display_name}</span>`;
+                                    li.onclick = () => {
+                                        input.value = item.display_name;
+                                        list.classList.add('hidden');
+                                    };
+                                    list.appendChild(li);
+                                });
+                                list.classList.remove('hidden');
+                            } else {
+                                list.classList.add('hidden');
+                            }
+                        });
+                }, 500); // Espera 500ms para no saturar
+            });
+
+            // Cerrar lista al hacer clic fuera
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target !== list) {
+                    list.classList.add('hidden');
+                }
+            });
+        }
+
+        // ================= FINALIZAR ORDEN Y PAGO =================
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-process-order');
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Cargando terminal segura...';
             btn.disabled = true;
 
-            // Limpiar cualquier botón anterior para que no se amontonen
             document.getElementById('wallet_container').innerHTML = '';
 
             const needsInstall = cart.some(i => i.wantsInstall);
@@ -274,9 +318,11 @@
             
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
+            // NUEVO: Agregamos el correo a la base de datos
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
+                customerEmail: document.getElementById('c-email').value,
                 shippingAddress: shippingAddress,
                 needsInstall: needsInstall,
                 installAddress: finalInstallAddress,
@@ -290,7 +336,6 @@
             try {
                 await addDoc(collection(db, "orders"), orderData);
                 
-                // 1. CAMBIA ESTA URL POR LA TUYA DE RENDER (Para generar la preferencia)
                 const responsePref = await fetch("https://servidor-kruger.onrender.com/create_preference", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -299,23 +344,21 @@
 
                 const preference = await responsePref.json();
 
-                btn.classList.add('hidden'); // Ocultar el botón azul original
+                btn.classList.add('hidden'); 
 
                 const cleanAmount = Number(totalAmount);
                 
-                // 2. DIBUJAR EL FORMULARIO DE TARJETA DIRECTO
                 const bricksBuilder = mp.bricks();
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: {
-                        amount: cleanAmount, // <--- Este número debe ser mayor a 0 (ej. 10 o 50)
+                        amount: cleanAmount, 
                         preferenceId: preference.id,
                     },
-                    // ... resto de configuraciones ...
                     customization: {
                         paymentMethods: {
-                            ticket: "all", // Permite Oxxo
-                            creditCard: "all", // Tarjetas de crédito (sin cuenta MP)
-                            debitCard: "all", // Tarjetas de débito
+                            // ticket: "all", // <- Eliminado OXXO/Efectivo
+                            creditCard: "all", 
+                            debitCard: "all", 
                             mercadoPago: "all",
                         },
                     },
@@ -323,9 +366,8 @@
                         onReady: () => {
                             console.log("Formulario de tarjeta cargado.");
                         },
-                       onSubmit: ({ selectedPaymentMethod, formData }) => {
+                        onSubmit: ({ selectedPaymentMethod, formData }) => {
                             return new Promise((resolve, reject) => {
-                                // CAMBIA LA URL POR LA TUYA DE RENDER
                                 fetch("https://servidor-kruger.onrender.com/process_payment", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
@@ -333,33 +375,36 @@
                                 })
                                 .then((response) => response.json())
                                 .then((response) => {
-                                    resolve(); // Detiene la animación del botón
+                                    resolve(); 
 
-                                    // Si el servidor marca error de conexión
                                     if (response.error) {
                                         alert("No se pudo procesar: " + response.error);
                                         return;
                                     }
 
-                                    // Evaluamos la respuesta oficial del banco
+                                    // REDIRECCIONES A PÁGINAS NUEVAS Y GUARDADO DE PDF
                                     if (response.status === "approved") {
-                                        alert("¡Pago exitoso! Tu pedido ha sido confirmado.");
-                                        cart = []; // Vaciamos el carrito
+                                        // Guardar los datos para el PDF
+                                        localStorage.setItem("ordenKruger", JSON.stringify({
+                                            email: orderData.customerEmail,
+                                            total: cleanAmount,
+                                            items: cart
+                                        }));
+                                        
+                                        cart = []; 
                                         updateCart();
-                                        // Recargamos la página para limpiarla
-                                        window.location.reload(); 
+                                        window.location.href = "success.html"; // Mandamos a la página exitosa
                                     } else if (response.status === "in_process") {
                                         alert("Tu pago está siendo revisado por el banco. Te avisaremos en breve.");
-                                        window.location.reload();
+                                        window.location.href = "success.html";
                                     } else if (response.status === "rejected") {
-                                        // Mercado pago detalla por qué lo rechazó (ej. fondos insuficientes, declinado)
-                                        alert("El banco rechazó el pago. Por favor intenta con otra tarjeta.");
+                                        window.location.href = "error.html"; // Mandamos a la página de error
                                     } else {
                                         alert("Estado del pago: " + response.status);
                                     }
                                 })
                                 .catch((error) => {
-                                    reject(); // Si falla el internet
+                                    reject(); 
                                     alert("Error de red al intentar procesar el pago.");
                                 });
                             });
@@ -376,6 +421,12 @@
                 btn.disabled = false;
                 btn.classList.remove('hidden');
             } 
+        });
+
+        // Inicializar el buscador de direcciones al cargar la página
+        document.addEventListener("DOMContentLoaded", () => {
+            setupAutocomplete('c-address', 'address-suggestions');
+            setupAutocomplete('c-install-address', 'install-address-suggestions');
         });
     </script>
 </head>
@@ -649,9 +700,11 @@
             </div>
 
             <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto">
-                <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos de envío</h3>
+                <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos</h3>
                 
                 <form id="checkout-form" class="space-y-5">
+                    
+                    <!-- NUEVO BLOQUE: Nombre, Teléfono y Correo -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Completo</label>
@@ -662,10 +715,16 @@
                             <input type="tel" id="c-phone" required class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
                         </div>
                     </div>
-
                     <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico (Para enviar tu recibo)</label>
+                        <input type="email" id="c-email" required placeholder="ejemplo@correo.com" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                    </div>
+
+                    <!-- NUEVO: BUSCADOR DE DIRECCIÓN DE ENVÍO -->
+                    <div class="relative">
                         <label class="block text-sm font-bold text-gray-700 mb-1">Dirección de Envío Completa</label>
-                        <input type="text" id="c-address" required placeholder="Calle, Número, Colonia, Municipio, C.P." class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                        <input type="text" id="c-address" required placeholder="Empieza a escribir tu calle y selecciona una opción..." autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
+                        <ul id="address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
                     </div>
 
                     <!-- SECCIÓN DINÁMICA DE INSTALACIÓN -->
@@ -677,11 +736,16 @@
                             <span class="text-sm text-gray-700 font-medium">Instalar en la misma dirección de envío</span>
                         </label>
                         
-                        <input type="text" id="c-install-address" placeholder="Escribe la dirección de instalación diferente" class="hidden mb-4 w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                        <!-- NUEVO: BUSCADOR DE DIRECCIÓN DE INSTALACIÓN -->
+                        <div id="c-install-address-container" class="relative hidden mb-4">
+                            <input type="text" id="c-install-address" placeholder="Escribe la dirección de instalación diferente" autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
+                            <ul id="install-address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
+                        </div>
                         
+                        <!-- NUEVO: SELECTOR DE FECHA Y HORA (CALENDARIO) -->
                         <div>
-                            <label class="block text-sm font-bold text-gray-700 mb-1">Horarios Disponibles para Visita</label>
-                            <input type="text" id="c-schedule" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Fecha y Hora Preferida para Visita</label>
+                            <input type="datetime-local" id="c-schedule" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none cursor-pointer">
                             <p class="text-xs text-metallic-red mt-2 font-bold"><i class="fas fa-info-circle mr-1"></i> Confirmaremos el horario exacto por teléfono.</p>
                         </div>
                     </div>
