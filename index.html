@@ -300,12 +300,14 @@
                 const preference = await responsePref.json();
 
                 btn.classList.add('hidden'); // Ocultar el botón azul original
+
+                const cleanAmount = Number(totalAmount);
                 
                 // 2. DIBUJAR EL FORMULARIO DE TARJETA DIRECTO
                 const bricksBuilder = mp.bricks();
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: {
-                        amount: totalAmount, // <--- Este número debe ser mayor a 0 (ej. 10 o 50)
+                        amount: cleanAmount, // <--- Este número debe ser mayor a 0 (ej. 10 o 50)
                         preferenceId: preference.id,
                     },
                     // ... resto de configuraciones ...
