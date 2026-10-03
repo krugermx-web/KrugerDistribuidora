@@ -49,7 +49,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot} from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, doc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCSdcopQjbZoYwcgwjB8uhosN-yY11kMdQ",
@@ -66,7 +66,9 @@
         const mp = new MercadoPago('APP_USR-80117618-df58-4d18-8140-3b3e5f4c1f5d', { locale: 'es-MX' });
 
         let products = [];
+        // === CARRITO INMORTAL ===
         let cart = JSON.parse(localStorage.getItem('krugerCart')) || [];
+        // ========================
         let currentActiveProduct = null;
 
         const productsGrid = document.getElementById('products-grid');
@@ -90,12 +92,9 @@
             }
             productsGrid.innerHTML = products.map(product => `
                 <div class="glass-card rounded-3xl overflow-hidden group hover:shadow-[0_20px_40px_rgba(0,40,85,0.1)] transition-all duration-300 relative">
-                    
-                    <!-- BADGE ENVÍO GRATIS -->
                     <div class="absolute top-4 right-4 bg-green-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg z-10 flex items-center gap-1">
                         <i class="fas fa-truck-fast"></i> Envío Gratis
                     </div>
-
                     <div onclick="openProductDetail('${product.id}')" class="relative h-72 overflow-hidden bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-8 cursor-pointer">
                         <img src="${product.image}" alt="${product.name}" class="object-contain w-full h-full group-hover:scale-110 transition-transform duration-500 drop-shadow-2xl">
                         <span class="absolute top-4 left-4 bg-metallic-red text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md">${product.type}</span>
@@ -103,8 +102,6 @@
                     <div class="p-8">
                         <h3 class="text-2xl font-bold text-metallic-blue mb-2">${product.name}</h3>
                         <p class="text-3xl font-black text-gray-900 mb-6">$${product.price.toLocaleString('es-MX')} <span class="text-base font-medium text-gray-500">MXN</span></p>
-                        
-                        <!-- Casilla de Instalación Rápida -->
                         ${(product.installPrice && product.installPrice > 0) ? `
                             <div class="mb-4 bg-white/50 p-3 rounded-xl border border-gray-100">
                                 <label class="flex items-center gap-3 cursor-pointer">
@@ -113,7 +110,6 @@
                                 </label>
                             </div>
                         ` : ''}
-
                         <button onclick="addToCart('${product.id}')" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-semibold py-4 rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 shadow-lg shadow-blue-900/20 transform hover:-translate-y-1">
                             Agregar al carrito
                         </button>
@@ -122,16 +118,13 @@
             `).join('');
         }
 
-        // ================= MODAL DE DETALLE Y FICHA TÉCNICA =================
         window.openProductDetail = (id) => {
             currentActiveProduct = products.find(p => p.id === id);
             const p = currentActiveProduct;
-            
             document.getElementById('detail-name').innerText = p.name;
             document.getElementById('detail-price').innerText = `$${p.price.toLocaleString('es-MX')} MXN`;
             document.getElementById('detail-desc').innerText = p.description || "Calentador Krüger con ingeniería alemana de máxima eficiencia y ahorro de gas comprobado. Construcción reforzada para larga durabilidad y tecnología de temperatura constante.";
             document.getElementById('detail-main-img').src = p.image;
-
             const installContainer = document.getElementById('detail-install-container');
             if(p.installPrice > 0) {
                 installContainer.innerHTML = `
@@ -145,10 +138,7 @@
                         </label>
                     </div>
                 `;
-            } else {
-                installContainer.innerHTML = '';
-            }
-
+            } else { installContainer.innerHTML = ''; }
             detailModal.classList.remove('hidden');
         };
 
@@ -158,7 +148,6 @@
             const p = currentActiveProduct;
             const installCheck = document.getElementById('detail-install-check');
             const wantsInstall = installCheck ? installCheck.checked : false;
-            
             const cartItemId = p.id + (wantsInstall ? '-with-install' : '');
             const existing = cart.find(item => item.cartItemId === cartItemId);
             
@@ -170,12 +159,10 @@
             openCart();
         };
 
-        // ================= LÓGICA DEL CARRITO =================
         window.addToCart = (id) => {
             const product = products.find(p => p.id === id);
             const installCheck = document.getElementById(`install-${id}`);
             const wantsInstall = installCheck ? installCheck.checked : false;
-            
             const cartItemId = id + (wantsInstall ? '-with-install' : '');
             const existingItem = cart.find(item => item.cartItemId === cartItemId);
             
@@ -193,9 +180,11 @@
         };
 
         function updateCart() {
+            // === GUARDAR CARRITO EN MEMORIA ===
             localStorage.setItem('krugerCart', JSON.stringify(cart));
-            cartCount.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
+            // ==================================
             
+            cartCount.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
             const total = cart.reduce((sum, item) => {
                 let itemTotal = item.price;
                 if(item.wantsInstall && item.installPrice) itemTotal += item.installPrice;
@@ -213,8 +202,7 @@
                         <img src="${item.image}" class="w-16 h-16 object-contain rounded-xl bg-gray-50 p-2">
                         <div class="flex-1 pr-6">
                             <h4 class="font-bold text-gray-800 text-sm mb-1">${item.name}</h4>
-                            <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>
-                            ${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
+                            <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
                             <span class="text-xs text-gray-500">Cant: ${item.quantity}</span>
                         </div>
                         <button onclick="removeFromCart('${item.cartItemId}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors">
@@ -230,7 +218,6 @@
         
         window.openCheckout = () => {
             if(cart.length === 0) return alert("Tu carrito está vacío");
-            
             const needsInstall = cart.some(item => item.wantsInstall);
             if(needsInstall) {
                 document.getElementById('installation-fields').classList.remove('hidden');
@@ -239,7 +226,6 @@
                 document.getElementById('installation-fields').classList.add('hidden');
                 document.getElementById('c-schedule').removeAttribute('required');
             }
-
             closeCart();
             checkoutModal.classList.remove('hidden');
         };
@@ -247,7 +233,7 @@
         window.closeCheckout = () => checkoutModal.classList.add('hidden');
 
         document.getElementById('c-same-address').addEventListener('change', (e) => {
-            const el = document.getElementById('c-install-address-container'); // Cambiado a contenedor
+            const el = document.getElementById('c-install-address-container'); 
             const input = document.getElementById('c-install-address');
             if(e.target.checked) {
                 el.classList.add('hidden');
@@ -258,20 +244,14 @@
             }
         });
 
-        // ================= BUSCADOR AUTOCOMPLETADO (Tipo Rappi) =================
         function setupAutocomplete(inputId, listId) {
             const input = document.getElementById(inputId);
             const list = document.getElementById(listId);
             let timeout = null;
-
             input.addEventListener('input', function() {
                 clearTimeout(timeout);
                 const query = this.value;
-                if (query.length < 5) {
-                    list.classList.add('hidden');
-                    return;
-                }
-                
+                if (query.length < 5) { list.classList.add('hidden'); return; }
                 timeout = setTimeout(() => {
                     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&limit=5`)
                         .then(res => res.json())
@@ -282,29 +262,19 @@
                                     const li = document.createElement('li');
                                     li.className = 'p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-sm text-gray-700 flex items-start gap-2';
                                     li.innerHTML = `<i class="fas fa-map-marker-alt text-metallic-red mt-1"></i> <span>${item.display_name}</span>`;
-                                    li.onclick = () => {
-                                        input.value = item.display_name;
-                                        list.classList.add('hidden');
-                                    };
+                                    li.onclick = () => { input.value = item.display_name; list.classList.add('hidden'); };
                                     list.appendChild(li);
                                 });
                                 list.classList.remove('hidden');
-                            } else {
-                                list.classList.add('hidden');
-                            }
+                            } else { list.classList.add('hidden'); }
                         });
-                }, 500); // Espera 500ms para no saturar
+                }, 500); 
             });
-
-            // Cerrar lista al hacer clic fuera
             document.addEventListener('click', function(e) {
-                if (e.target !== input && e.target !== list) {
-                    list.classList.add('hidden');
-                }
+                if (e.target !== input && e.target !== list) list.classList.add('hidden');
             });
         }
 
-      // ================= FINALIZAR ORDEN Y PAGO =================
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-process-order');
@@ -316,10 +286,8 @@
             const needsInstall = cart.some(i => i.wantsInstall);
             const shippingAddress = document.getElementById('c-address').value;
             const finalInstallAddress = needsInstall ? (document.getElementById('c-same-address').checked ? shippingAddress : document.getElementById('c-install-address').value) : "";
-            
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
-            // PREPARAMOS LOS DATOS PERO AÚN NO LOS GUARDAMOS EN LA BASE DE DATOS
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
@@ -334,7 +302,6 @@
             };
 
             try {
-                // Creamos la preferencia de Mercado Pago
                 const responsePref = await fetch("https://servidor-kruger.onrender.com/create_preference", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -371,7 +338,6 @@
                                         return;
                                     }
 
-                                    // AHORA SÍ: SI EL PAGO PASÓ, GUARDAMOS EN FIREBASE
                                     if (response.status === "approved") {
                                         orderData.status = "Pagado";
                                         orderData.mp_payment_id = response.id;
@@ -383,12 +349,16 @@
                                             items: cart
                                         }));
                                         
+                                        // === VACIAR CARRITO PORQUE YA COMPRÓ ===
+                                        localStorage.removeItem('krugerCart');
                                         cart = []; 
                                         window.location.href = "success.html"; 
                                     } else if (response.status === "in_process") {
                                         alert("Tu pago está siendo revisado por el banco.");
                                         window.location.href = "success.html";
                                     } else if (response.status === "rejected") {
+                                        // === ATRAPAMOS EL MOTIVO DEL RECHAZO ===
+                                        localStorage.setItem("krugerError", response.status_detail);
                                         window.location.href = "error.html"; 
                                     }
                                 })
@@ -410,8 +380,9 @@
             } 
         });
 
-        // Inicializar el buscador de direcciones al cargar la página
         document.addEventListener("DOMContentLoaded", () => {
+            // === CARGAMOS EL CARRITO AL ABRIR LA PÁGINA ===
+            updateCart(); 
             setupAutocomplete('c-address', 'address-suggestions');
             setupAutocomplete('c-install-address', 'install-address-suggestions');
         });
@@ -424,7 +395,7 @@
             <div class="flex justify-between h-20 items-center">
                 <div class="flex flex-col">
                     <div class="flex items-center">
-                        <img src="./kruger.png" alt="Krüger" class="h-8 md:h-10 w-auto object-contain" onerror="this.onerror=null; this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
+                        <img src="./logo-kruger.png" alt="Krüger" class="h-8 md:h-10 w-auto object-contain" onerror="this.onerror=null; this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
                     </div>
                     <span class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-1">Distribuidor Autorizado</span>
                 </div>
@@ -691,7 +662,6 @@
                 
                 <form id="checkout-form" class="space-y-5">
                     
-                    <!-- NUEVO BLOQUE: Nombre, Teléfono y Correo -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1">Nombre Completo</label>
@@ -707,14 +677,12 @@
                         <input type="email" id="c-email" required placeholder="ejemplo@correo.com" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none">
                     </div>
 
-                    <!-- NUEVO: BUSCADOR DE DIRECCIÓN DE ENVÍO -->
                     <div class="relative">
                         <label class="block text-sm font-bold text-gray-700 mb-1">Dirección de Envío Completa</label>
                         <input type="text" id="c-address" required placeholder="Empieza a escribir tu calle y selecciona una opción..." autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
                         <ul id="address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
                     </div>
 
-                    <!-- SECCIÓN DINÁMICA DE INSTALACIÓN -->
                     <div id="installation-fields" class="hidden bg-blue-50/50 p-6 rounded-2xl border border-blue-100 mt-4">
                         <h4 class="text-sm font-bold text-metallic-blue mb-4"><i class="fas fa-tools mr-1"></i> Detalles de Instalación (León, Gto)</h4>
                         
@@ -723,13 +691,11 @@
                             <span class="text-sm text-gray-700 font-medium">Instalar en la misma dirección de envío</span>
                         </label>
                         
-                        <!-- NUEVO: BUSCADOR DE DIRECCIÓN DE INSTALACIÓN -->
                         <div id="c-install-address-container" class="relative hidden mb-4">
                             <input type="text" id="c-install-address" placeholder="Escribe la dirección de instalación diferente" autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
                             <ul id="install-address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
                         </div>
                         
-                        <!-- NUEVO: SELECTOR DE FECHA Y HORA (CALENDARIO) -->
                         <div>
                             <label class="block text-sm font-bold text-gray-700 mb-1">Fecha y Hora Preferida para Visita</label>
                             <input type="datetime-local" id="c-schedule" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none cursor-pointer">
@@ -741,7 +707,6 @@
                         <i class="fas fa-lock"></i> Proceder al Pago Seguro
                     </button>
 
-                    <!-- CONTENEDOR MERCADO PAGO BRICKS -->
                     <div id="wallet_container" class="mt-4"></div>
                 </form>
             </div>
@@ -764,8 +729,8 @@
             </div>
             <div>
                 <h4 class="text-white font-bold mb-4 uppercase text-sm tracking-wider">Soporte</h4>
-                <p class="text-sm mb-2"><i class="fas fa-phone mr-2"></i> 477 333 80 84</p>
-                <p class="text-sm"><i class="fas fa-envelope mr-2"></i> krugerdistribudorautorizado@gmail.com</p>
+                <p class="text-sm mb-2"><i class="fas fa-phone mr-2"></i> 800-123-KRÜGER</p>
+                <p class="text-sm"><i class="fas fa-envelope mr-2"></i> ventas@kruger-distribuidor.mx</p>
             </div>
         </div>
     </footer>
