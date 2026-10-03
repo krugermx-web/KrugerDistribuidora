@@ -193,6 +193,7 @@
         };
 
         function updateCart() {
+            localStorage.setItem('krugerCart', JSON.stringify(cart));
             cartCount.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
             
             const total = cart.reduce((sum, item) => {
