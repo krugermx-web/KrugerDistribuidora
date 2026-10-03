@@ -66,9 +66,7 @@
         const mp = new MercadoPago('APP_USR-80117618-df58-4d18-8140-3b3e5f4c1f5d', { locale: 'es-MX' });
 
         let products = [];
-        // === CARRITO INMORTAL ===
         let cart = JSON.parse(localStorage.getItem('krugerCart')) || [];
-        // ========================
         let currentActiveProduct = null;
 
         const productsGrid = document.getElementById('products-grid');
@@ -180,9 +178,7 @@
         };
 
         function updateCart() {
-            // === GUARDAR CARRITO EN MEMORIA ===
             localStorage.setItem('krugerCart', JSON.stringify(cart));
-            // ==================================
             
             cartCount.innerText = cart.reduce((sum, item) => sum + item.quantity, 0);
             const total = cart.reduce((sum, item) => {
@@ -192,7 +188,7 @@
             }, 0);
 
             cartTotal.innerText = `$${total.toLocaleString('es-MX')}`;
-            finalTotal.innerText = `$${total.toLocaleString('es-MX')} MXN`;
+            if(finalTotal) finalTotal.innerText = `$${total.toLocaleString('es-MX')} MXN`;
 
             if (cart.length === 0) {
                 cartItemsList.innerHTML = `<p class="text-gray-500 text-center py-10">Tu carrito está vacío</p>`;
@@ -202,7 +198,8 @@
                         <img src="${item.image}" class="w-16 h-16 object-contain rounded-xl bg-gray-50 p-2">
                         <div class="flex-1 pr-6">
                             <h4 class="font-bold text-gray-800 text-sm mb-1">${item.name}</h4>
-                            <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
+                            <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>
+                            ${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
                             <span class="text-xs text-gray-500">Cant: ${item.quantity}</span>
                         </div>
                         <button onclick="removeFromCart('${item.cartItemId}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors">
@@ -216,8 +213,12 @@
         window.openCart = () => cartModal.classList.remove('translate-x-full');
         window.closeCart = () => cartModal.classList.add('translate-x-full');
         
+        // =======================================================================
+        // NUEVA LÓGICA DE APERTURA DEL CHECKOUT (CON FOTOS E IMPUESTOS)
+        // =======================================================================
         window.openCheckout = () => {
             if(cart.length === 0) return alert("Tu carrito está vacío");
+            
             const needsInstall = cart.some(item => item.wantsInstall);
             if(needsInstall) {
                 document.getElementById('installation-fields').classList.remove('hidden');
@@ -226,9 +227,35 @@
                 document.getElementById('installation-fields').classList.add('hidden');
                 document.getElementById('c-schedule').removeAttribute('required');
             }
+
+            // 1. Inyectar las fotitos de los productos en el resumen del checkout
+            const checkoutItemsList = document.getElementById('checkout-items-list');
+            checkoutItemsList.innerHTML = cart.map(item => `
+                <div class="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
+                    <img src="${item.image}" class="w-12 h-12 object-contain bg-gray-50 rounded-lg p-1">
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-xs font-bold text-gray-800 leading-tight truncate">${item.name}</h4>
+                        <div class="text-[10px] text-gray-500 mt-0.5">Cant: ${item.quantity} ${item.wantsInstall ? '<span class="text-metallic-red font-bold ml-1">(+Instalación)</span>' : ''}</div>
+                    </div>
+                    <div class="text-sm font-black text-metallic-blue whitespace-nowrap">
+                        $${((item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity).toLocaleString('es-MX')}
+                    </div>
+                </div>
+            `).join('');
+
+            // 2. Calcular los totales hacia atrás (Subtotal e IVA)
+            const total = cart.reduce((sum, item) => sum + ((item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity), 0);
+            const subtotal = total / 1.16;
+            const iva = total - subtotal;
+
+            document.getElementById('checkout-subtotal').innerText = '$' + subtotal.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('checkout-iva').innerText = '$' + iva.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('final-total').innerText = '$' + total.toLocaleString('es-MX') + ' MXN';
+
             closeCart();
             checkoutModal.classList.remove('hidden');
         };
+        // =======================================================================
         
         window.closeCheckout = () => checkoutModal.classList.add('hidden');
 
@@ -349,7 +376,6 @@
                                             items: cart
                                         }));
                                         
-                                        // === VACIAR CARRITO PORQUE YA COMPRÓ ===
                                         localStorage.removeItem('krugerCart');
                                         cart = []; 
                                         window.location.href = "success.html"; 
@@ -357,7 +383,6 @@
                                         alert("Tu pago está siendo revisado por el banco.");
                                         window.location.href = "success.html";
                                     } else if (response.status === "rejected") {
-                                        // === ATRAPAMOS EL MOTIVO DEL RECHAZO ===
                                         localStorage.setItem("krugerError", response.status_detail);
                                         window.location.href = "error.html"; 
                                     }
@@ -381,7 +406,6 @@
         });
 
         document.addEventListener("DOMContentLoaded", () => {
-            // === CARGAMOS EL CARRITO AL ABRIR LA PÁGINA ===
             updateCart(); 
             setupAutocomplete('c-address', 'address-suggestions');
             setupAutocomplete('c-install-address', 'install-address-suggestions');
@@ -416,6 +440,7 @@
         </div>
     </nav>
 
+    <!-- (Secciones de presentación de la página se mantienen intactas) -->
     <div class="relative pt-20 pb-32 bg-gradient-to-br from-metallic-blue via-[#001530] to-black overflow-hidden">
         <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] mix-blend-overlay"></div>
         <div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-metallic-blue rounded-full filter blur-[120px] opacity-50 mix-blend-screen"></div>
@@ -578,12 +603,11 @@
         </div>
     </main>
 
-    <!-- NUEVO: MODAL DE DETALLE Y FICHA TÉCNICA -->
+    <!-- MODAL DE DETALLE Y FICHA TÉCNICA -->
     <div id="product-detail-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 md:p-10 backdrop-blur-md overflow-y-auto">
         <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl relative flex flex-col md:flex-row overflow-hidden my-auto">
             <button onclick="closeProductDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-metallic-red bg-white rounded-full p-2 z-10 shadow-sm"><i class="fas fa-times text-xl"></i></button>
             
-            <!-- Izquierda: Galería -->
             <div class="md:w-1/2 bg-gray-50 p-8 flex flex-col border-r border-gray-100">
                 <div class="self-start bg-green-100 text-green-700 text-xs font-black px-3 py-1.5 rounded-full uppercase tracking-wider mb-4 flex items-center gap-2">
                     <i class="fas fa-truck-fast"></i> Envío Gratis a domicilio
@@ -593,7 +617,6 @@
                 </div>
             </div>
 
-            <!-- Derecha: Información del Producto -->
             <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
                 <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Tecnología Alemana</span>
                 <h2 id="detail-name" class="text-3xl md:text-4xl font-black text-metallic-blue mb-4 leading-tight">Modelo</h2>
@@ -639,24 +662,45 @@
         </div>
     </div>
 
-    <!-- MODAL CHECKOUT -->
+    <!-- === NUEVO MODAL CHECKOUT CON FOTOS Y DESGLOSE DE IMPUESTOS === -->
     <div id="checkout-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
         <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl">
             
-            <div class="bg-gray-50 p-8 md:p-10 md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between">
+            <!-- PANEL IZQUIERDO: RESUMEN DE LA COMPRA -->
+            <div class="bg-gray-50 p-6 md:p-10 md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between">
                 <div>
-                    <h3 class="text-xl font-black text-metallic-blue mb-4">Resumen</h3>
-                    <div class="text-4xl font-black text-gray-900 mb-6" id="final-total">$0 MXN</div>
+                    <h3 class="text-xl font-black text-metallic-blue mb-4">Resumen de tu Pedido</h3>
                     
-                    <div class="bg-green-100 text-green-800 text-sm font-bold p-3 rounded-lg mb-6 flex items-center gap-2">
-                        <i class="fas fa-check-circle"></i> Envío nacional Gratis
+                    <!-- Lista inyectada con JS -->
+                    <div id="checkout-items-list" class="mb-4 space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar"></div>
+                    
+                    <!-- Desglose de Totales -->
+                    <div class="border-t border-gray-200 pt-4 mb-4">
+                        <div class="flex justify-between text-sm text-gray-600 mb-2">
+                            <span>Subtotal (Sin IVA)</span>
+                            <span id="checkout-subtotal" class="font-bold text-gray-800">$0.00</span>
+                        </div>
+                        <div class="flex justify-between text-sm text-gray-600 mb-4">
+                            <span>IVA (16%)</span>
+                            <span id="checkout-iva" class="font-bold text-gray-800">$0.00</span>
+                        </div>
+                        <div class="flex justify-between items-end border-t border-gray-200 pt-3">
+                            <span class="text-base font-bold text-gray-800">Total a pagar</span>
+                            <div class="text-2xl font-black text-gray-900" id="final-total">$0 MXN</div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-green-100 text-green-800 text-xs font-bold p-3 rounded-lg flex items-center gap-2">
+                        <i class="fas fa-check-circle text-lg"></i> Envío nacional Gratis
                     </div>
                 </div>
-                <button type="button" onclick="closeCheckout()" class="text-sm text-gray-500 font-bold hover:text-metallic-red text-left">
-                    <i class="fas fa-arrow-left mr-1"></i> Volver al carrito
+                
+                <button type="button" onclick="closeCheckout()" class="text-sm text-gray-500 font-bold hover:text-metallic-red text-left mt-6 flex items-center">
+                    <i class="fas fa-arrow-left mr-2"></i> Volver al carrito
                 </button>
             </div>
 
+            <!-- PANEL DERECHO: FORMULARIO -->
             <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto">
                 <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos</h3>
                 
