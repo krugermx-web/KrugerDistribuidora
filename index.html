@@ -103,7 +103,7 @@
                         ${(product.installPrice && product.installPrice > 0) ? `
                             <div class="mb-4 bg-white/50 p-3 rounded-xl border border-gray-100">
                                 <label class="flex items-center gap-3 cursor-pointer">
-                                    <input type="checkbox" id="install-${product.id}" class="w-5 h-5 text-metallic-blue rounded border-gray-300">
+                                    <input type="checkbox" id="install-${product.id}" onchange="if(this.checked) { if(!confirm('⚠️ ATENCIÓN: El servicio de instalación EXCLUSIVAMENTE tiene cobertura en la ciudad de León, Guanajuato.\\n\\n¿Confirmas que el domicilio de instalación se encuentra en León, Gto?')) this.checked = false; }" class="w-5 h-5 text-metallic-blue rounded border-gray-300">
                                     <span class="text-sm text-gray-600 font-medium">Instalación León <strong class="text-metallic-red">+$${product.installPrice.toLocaleString('es-MX')}</strong></span>
                                 </label>
                             </div>
@@ -128,7 +128,7 @@
                 installContainer.innerHTML = `
                     <div class="mt-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
                         <label class="flex items-start gap-3 cursor-pointer">
-                            <input type="checkbox" id="detail-install-check" class="mt-1 w-5 h-5 text-metallic-blue rounded border-gray-300">
+                            <input type="checkbox" id="detail-install-check" onchange="if(this.checked) { if(!confirm('⚠️ ATENCIÓN: El servicio de instalación EXCLUSIVAMENTE tiene cobertura en la ciudad de León, Guanajuato.\\n\\n¿Confirmas que el domicilio de instalación se encuentra en León, Gto?')) this.checked = false; }" class="mt-1 w-5 h-5 text-metallic-blue rounded border-gray-300">
                             <span class="text-sm text-gray-700 font-medium">
                                 Agregar Instalación Certificada (León, Gto) <br>
                                 <strong class="text-metallic-red text-base">+$${p.installPrice.toLocaleString('es-MX')} MXN</strong>
@@ -213,9 +213,6 @@
         window.openCart = () => cartModal.classList.remove('translate-x-full');
         window.closeCart = () => cartModal.classList.add('translate-x-full');
         
-        // =======================================================================
-        // NUEVA LÓGICA DE APERTURA DEL CHECKOUT (CON FOTOS E IMPUESTOS)
-        // =======================================================================
         window.openCheckout = () => {
             if(cart.length === 0) return alert("Tu carrito está vacío");
             
@@ -228,7 +225,6 @@
                 document.getElementById('c-schedule').removeAttribute('required');
             }
 
-            // 1. Inyectar las fotitos de los productos en el resumen del checkout
             const checkoutItemsList = document.getElementById('checkout-items-list');
             checkoutItemsList.innerHTML = cart.map(item => `
                 <div class="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-gray-100 shadow-sm">
@@ -243,7 +239,6 @@
                 </div>
             `).join('');
 
-            // 2. Calcular los totales hacia atrás (Subtotal e IVA)
             const total = cart.reduce((sum, item) => sum + ((item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity), 0);
             const subtotal = total / 1.16;
             const iva = total - subtotal;
@@ -255,7 +250,6 @@
             closeCart();
             checkoutModal.classList.remove('hidden');
         };
-        // =======================================================================
         
         window.closeCheckout = () => checkoutModal.classList.add('hidden');
 
@@ -280,6 +274,7 @@
                 const query = this.value;
                 if (query.length < 5) { list.classList.add('hidden'); return; }
                 timeout = setTimeout(() => {
+                    // El limitador countrycodes=mx ya fuerza resultados dentro de México
                     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&limit=5`)
                         .then(res => res.json())
                         .then(data => {
@@ -313,6 +308,33 @@
             const needsInstall = cart.some(i => i.wantsInstall);
             const shippingAddress = document.getElementById('c-address').value;
             const finalInstallAddress = needsInstall ? (document.getElementById('c-same-address').checked ? shippingAddress : document.getElementById('c-install-address').value) : "";
+            
+            // =========================================================
+            // VALIDACIÓN ESTRICTA DE ZONA (ENVÍO Y LEÓN, GTO)
+            // =========================================================
+            const addrLower = shippingAddress.toLowerCase();
+            if (!addrLower.includes('mexico') && !addrLower.includes('méxico')) {
+                alert("🛑 COBERTURA INVÁLIDA: Por el momento, nuestros envíos están limitados EXCLUSIVAMENTE a la República Mexicana.\n\nAsegúrate de usar el buscador autocompletado para seleccionar una dirección válida que incluya el país.");
+                btn.innerHTML = '<i class="fas fa-lock mr-2"></i> Proceder al Pago Seguro';
+                btn.disabled = false;
+                return;
+            }
+
+            if (needsInstall) {
+                const instLower = finalInstallAddress.toLowerCase();
+                // Verificamos que contenga "Leon" Y ("Gto" o "Guanajuato") para evitar confundir con "Nuevo Leon"
+                const isLeonGto = (instLower.includes('leon') || instLower.includes('león')) && 
+                                  (instLower.includes('gto') || instLower.includes('guanajuato'));
+                
+                if (!isLeonGto) {
+                    alert("🛑 COBERTURA DE INSTALACIÓN INVÁLIDA: El sistema detecta que la dirección de instalación no pertenece a León, Guanajuato.\n\nEl servicio de instalación es un servicio local. Por favor, corrige la dirección o regresa al carrito para quitar la instalación de tus productos.");
+                    btn.innerHTML = '<i class="fas fa-lock mr-2"></i> Proceder al Pago Seguro';
+                    btn.disabled = false;
+                    return;
+                }
+            }
+            // =========================================================
+
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
             const orderData = {
@@ -440,7 +462,6 @@
         </div>
     </nav>
 
-    <!-- (Secciones de presentación de la página se mantienen intactas) -->
     <div class="relative pt-20 pb-32 bg-gradient-to-br from-metallic-blue via-[#001530] to-black overflow-hidden">
         <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')] mix-blend-overlay"></div>
         <div class="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-metallic-blue rounded-full filter blur-[120px] opacity-50 mix-blend-screen"></div>
@@ -662,19 +683,16 @@
         </div>
     </div>
 
-    <!-- === NUEVO MODAL CHECKOUT CON FOTOS Y DESGLOSE DE IMPUESTOS === -->
+    <!-- MODAL CHECKOUT CON FOTOS Y DESGLOSE DE IMPUESTOS -->
     <div id="checkout-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
         <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl">
             
-            <!-- PANEL IZQUIERDO: RESUMEN DE LA COMPRA -->
             <div class="bg-gray-50 p-6 md:p-10 md:w-1/3 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col justify-between">
                 <div>
                     <h3 class="text-xl font-black text-metallic-blue mb-4">Resumen de tu Pedido</h3>
                     
-                    <!-- Lista inyectada con JS -->
                     <div id="checkout-items-list" class="mb-4 space-y-2 max-h-48 overflow-y-auto pr-1 no-scrollbar"></div>
                     
-                    <!-- Desglose de Totales -->
                     <div class="border-t border-gray-200 pt-4 mb-4">
                         <div class="flex justify-between text-sm text-gray-600 mb-2">
                             <span>Subtotal (Sin IVA)</span>
@@ -700,7 +718,6 @@
                 </button>
             </div>
 
-            <!-- PANEL DERECHO: FORMULARIO -->
             <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto">
                 <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos</h3>
                 
