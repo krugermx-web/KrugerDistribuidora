@@ -364,16 +364,15 @@
                 const cleanAmount = Number(totalAmount);
                 const bricksBuilder = mp.bricks();
                 
+                // === AQUÍ ESTABA EL ERROR DE LAS LLAVES QUE ARREGLAMOS ===
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: { amount: cleanAmount, preferenceId: preference.id },
-            customization: {
+                    customization: {
                         paymentMethods: { 
                             creditCard: "all", 
                             debitCard: "all", 
-                            mercadoPago: "all",
-                            maxInstallments: 1 // <--- ESTE ES EL CANDADO
+                            mercadoPago: "all"
                         },
-                    },
                     },
                     callbacks: {
                         onReady: () => { console.log("Formulario de tarjeta cargado."); },
