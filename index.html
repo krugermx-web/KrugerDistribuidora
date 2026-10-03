@@ -365,8 +365,14 @@
                 
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: { amount: cleanAmount, preferenceId: preference.id },
-                    customization: {
-                        paymentMethods: { creditCard: "all", debitCard: "all", mercadoPago: "all" },
+            customization: {
+                        paymentMethods: { 
+                            creditCard: "all", 
+                            debitCard: "all", 
+                            mercadoPago: "all",
+                            maxInstallments: 1 // <--- ESTE ES EL CANDADO
+                        },
+                    },
                     },
                     callbacks: {
                         onReady: () => { console.log("Formulario de tarjeta cargado."); },
