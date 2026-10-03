@@ -10,7 +10,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
     
-    <!-- LIBRERÍAS PROFESIONALES PARA GENERAR PDF NATIVO (NO CAPTURAS) -->
+    <!-- LIBRERÍAS PROFESIONALES PARA GENERAR PDF NATIVO -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
@@ -23,6 +23,10 @@
 </head>
 <body class="bg-[#F8F9FA] flex items-center justify-center min-h-screen p-4">
 
+    <!-- IMAGEN OCULTA EXCLUSIVA PARA EL PDF -->
+    <!-- Se usa la versión blanca porque la cabecera del PDF es azul oscuro -->
+    <img id="logo-blanco-pdf" src="./kruger.png" style="display:none;" crossorigin="anonymous">
+
     <!-- TARJETA DE ÉXITO -->
     <div class="bg-white rounded-3xl shadow-2xl p-8 md:p-12 max-w-lg w-full text-center border border-gray-100 relative overflow-hidden">
         
@@ -31,16 +35,23 @@
         <div class="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-500 rounded-full opacity-10 blur-2xl"></div>
 
         <div class="relative z-10">
-            <!-- Icono de éxito animado -->
-            <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-                <i class="fas fa-check text-5xl text-green-500"></i>
+            
+            <!-- NUEVO: LOGOTIPO EN LA PÁGINA -->
+            <div class="mb-8 flex flex-col items-center border-b border-gray-100 pb-8">
+                <img id="logo-img" src="./kruger.png" alt="Krüger" class="h-10 md:h-12 w-auto object-contain" onerror="this.onerror=null; this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
+                <span class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-2">Distribuidor Autorizado</span>
             </div>
             
-            <h1 class="text-4xl font-black text-metallic-blue mb-2">¡Pago Aprobado!</h1>
-            <p class="text-gray-500 mb-8 text-lg">Tu pedido ha sido procesado correctamente. Hemos enviado un correo de confirmación con los detalles a tu bandeja de entrada.</p>
+            <!-- Icono de éxito animado -->
+            <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                <i class="fas fa-check text-4xl text-green-500"></i>
+            </div>
+            
+            <h1 class="text-3xl font-black text-metallic-blue mb-2">¡Pago Aprobado!</h1>
+            <p class="text-gray-500 mb-8 text-base">Tu pedido ha sido procesado correctamente. Hemos enviado un correo de confirmación con los detalles a tu bandeja de entrada.</p>
             
             <div class="bg-gray-50 rounded-2xl p-6 mb-8 border border-gray-100 text-left">
-                <p class="text-sm font-bold text-gray-400 uppercase tracking-widest mb-1">Importe Pagado</p>
+                <p class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Importe Pagado</p>
                 <p class="text-3xl font-black text-gray-900" id="monto-total">$0.00 MXN</p>
             </div>
 
@@ -67,7 +78,6 @@
             if (ordenGuardada && ordenGuardada.total) {
                 document.getElementById('monto-total').innerText = `$${ordenGuardada.total.toLocaleString('es-MX')} MXN`;
             } else {
-                // Si alguien entra directo a success.html sin comprar
                 document.getElementById('monto-total').innerText = "Venta no encontrada";
             }
         });
@@ -97,19 +107,50 @@
             doc.setFillColor(0, 40, 85); // Color Azul Metálico Krüger
             doc.rect(0, 0, 210, 40, 'F'); // Barra superior
 
-            doc.setTextColor(255, 255, 255);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(24);
-            doc.text("KRÜGER", 14, 25);
-            
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            doc.text("DISTRIBUIDOR AUTORIZADO", 14, 32);
+            // NUEVO: ESTAMPAR EL LOGOTIPO EN EL PDF
+            const logoPdf = document.getElementById('logo-blanco-pdf');
+            // Verificamos si la imagen cargó bien para evitar errores
+            if (logoPdf && logoPdf.complete && logoPdf.naturalWidth > 0) {
+                try {
+                    // Truco del Canvas: Convertimos la imagen a digital para que el PDF la lea perfecto
+                    const canvas = document.createElement('canvas');
+                    canvas.width = logoPdf.naturalWidth;
+                    canvas.height = logoPdf.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(logoPdf, 0, 0);
+                    const imgData = canvas.toDataURL('image/png');
+                    
+                    // Insertar la imagen en el PDF (x: 14, y: 10, width: 38, height: 12)
+                    doc.addImage(imgData, 'PNG', 14, 10, 38, 12);
+                } catch(e) {
+                    console.error("No se pudo cargar el logo al PDF, usando texto.", e);
+                    imprimirTextoLogo(doc);
+                }
+            } else {
+                // Si por alguna razón el archivo no existe, usamos texto como respaldo
+                imprimirTextoLogo(doc);
+            }
 
+            function imprimirTextoLogo(documento) {
+                documento.setTextColor(255, 255, 255);
+                documento.setFont("helvetica", "bold");
+                documento.setFontSize(24);
+                documento.text("KRÜGER", 14, 23);
+            }
+            
+            // Texto de Distribuidor Autorizado en el PDF
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(9);
+            doc.text("DISTRIBUIDOR AUTORIZADO", 14, 30);
+
+            // Información de la derecha
             doc.setFontSize(16);
-            doc.text("RECIBO DE COMPRA", 130, 25);
+            doc.setFont("helvetica", "bold");
+            doc.text("RECIBO DE COMPRA", 130, 23);
             doc.setFontSize(10);
-            doc.text(`Fecha: ${fechaActual}`, 130, 32);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Fecha: ${fechaActual}`, 130, 30);
 
             // 2. DATOS DEL CLIENTE
             doc.setTextColor(50, 50, 50);
@@ -148,7 +189,6 @@
             });
 
             // 4. DIBUJAR TOTALES (Desglose de IVA)
-            // Calculamos dónde terminó la tabla para poner los totales abajo
             const posicionY = doc.lastAutoTable.finalY + 15;
 
             doc.setFont("helvetica", "normal");
