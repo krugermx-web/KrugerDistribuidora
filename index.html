@@ -63,13 +63,12 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Inicializar Mercado Pago
         const mp = new MercadoPago('APP_USR-80117618-df58-4d18-8140-3b3e5f4c1f5d', { locale: 'es-MX' });
 
         let products = [];
         let cart = JSON.parse(localStorage.getItem('krugerCart')) || [];
         let currentActiveProduct = null;
-        let activeCategory = 'Todos'; // Variable para el filtro de apartados
+        let activeCategory = 'Todos'; 
 
         const productsGrid = document.getElementById('products-grid');
         const cartCount = document.getElementById('cart-count');
@@ -85,7 +84,6 @@
             renderProducts();
         });
 
-        // Función para filtrar por apartados
         window.filterCat = (cat) => {
             activeCategory = cat;
             document.querySelectorAll('.cat-btn').forEach(btn => {
@@ -104,7 +102,6 @@
                 return;
             }
 
-            // Lógica del filtro
             const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => {
                 const pType = (p.type || p.category || '').toLowerCase();
                 const searchCat = activeCategory.toLowerCase();
@@ -116,21 +113,54 @@
                 return;
             }
 
-            // Adaptación de tarjeta a vista compacta de 2 columnas (Estilo ML)
-            productsGrid.innerHTML = filteredProducts.map(product => `
+            productsGrid.innerHTML = filteredProducts.map(product => {
+                const pTypeLower = (product.type || '').toLowerCase();
+                const needsGas = pTypeLower.includes('silver') || pTypeLower.includes('platinum') || pTypeLower.includes('instantáneo') || pTypeLower.includes('instantaneo') || pTypeLower.includes('parrilla');
+                
+                let gasSelectHtml = '';
+                if (needsGas) {
+                    gasSelectHtml = `
+                        <div class="mb-2 sm:mb-3">
+                            <select id="gas-${product.id}" class="w-full text-[10px] sm:text-xs font-semibold border border-gray-200 rounded-lg sm:rounded-xl p-1.5 sm:p-2 outline-none focus:border-metallic-blue focus:ring-1 focus:ring-metallic-blue bg-gray-50 text-gray-700">
+                                <option value="Gas LP">🔥 Gas LP</option>
+                                <option value="Gas Natural">🔥 Gas Natural</option>
+                            </select>
+                        </div>
+                    `;
+                }
+
+                let priceHtml = '';
+                if (product.originalPrice && product.originalPrice > product.price) {
+                    priceHtml = `
+                        <div class="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-2 mb-2 sm:mb-4">
+                            <span class="text-[10px] sm:text-sm text-gray-400 line-through font-semibold leading-none">$${product.originalPrice.toLocaleString('es-MX')}</span>
+                            <span class="text-base sm:text-2xl font-black text-metallic-red leading-none">$${product.price.toLocaleString('es-MX')} <span class="text-[9px] sm:text-xs font-medium text-gray-500">MXN</span></span>
+                        </div>
+                    `;
+                } else {
+                    priceHtml = `<p class="text-base sm:text-2xl font-black text-gray-900 mb-2 sm:mb-4">$${product.price.toLocaleString('es-MX')} <span class="text-[9px] sm:text-xs font-medium text-gray-500">MXN</span></p>`;
+                }
+
+                return `
                 <div class="glass-card rounded-2xl md:rounded-3xl overflow-hidden group hover:shadow-[0_20px_40px_rgba(0,40,85,0.1)] transition-all duration-300 relative flex flex-col h-full">
-                    <div class="absolute top-2 right-2 bg-green-500 text-white text-[8px] sm:text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider shadow-lg z-10 flex items-center gap-1">
-                        <i class="fas fa-truck-fast"></i> <span class="hidden sm:inline">Envío Gratis</span>
-                    </div>
                     <div onclick="openProductDetail('${product.id}')" class="relative h-32 sm:h-56 overflow-hidden bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4 cursor-pointer">
                         <img src="${product.image}" alt="${product.name}" class="object-contain w-full h-full group-hover:scale-110 transition-transform duration-500 drop-shadow-xl">
-                        <span class="absolute top-2 left-2 bg-metallic-red text-white text-[8px] sm:text-xs font-bold px-2 py-1 rounded-full uppercase tracking-widest shadow-md truncate max-w-[70%]">${product.type || ''}</span>
+                        
+                        <span class="absolute top-2 left-2 bg-metallic-red text-white text-[8px] sm:text-xs font-bold px-2 py-1 rounded-full uppercase tracking-widest shadow-md truncate max-w-[70%] z-10">${product.type || ''}</span>
+                        
+                        <div class="absolute bottom-2 right-2 bg-green-500 text-white text-[8px] sm:text-[10px] font-black px-2 py-1 rounded-xl rounded-br-none uppercase tracking-wider shadow-lg flex items-center gap-1 z-10">
+                            <i class="fas fa-truck-fast"></i> <span class="hidden sm:inline">Envío Gratis</span>
+                        </div>
                     </div>
+                    
                     <div class="p-3 sm:p-6 flex flex-col flex-1">
                         <h3 class="text-xs sm:text-lg font-bold text-metallic-blue mb-1 sm:mb-2 line-clamp-2">${product.name}</h3>
-                        <p class="text-base sm:text-2xl font-black text-gray-900 mb-2 sm:mb-4">$${product.price.toLocaleString('es-MX')} <span class="text-[9px] sm:text-xs font-medium text-gray-500">MXN</span></p>
+                        
+                        ${priceHtml}
                         
                         <div class="mt-auto">
+                            ${gasSelectHtml}
+                            
                             ${(product.installPrice && product.installPrice > 0) ? `
                                 <div class="mb-2 sm:mb-4 bg-white/50 p-1.5 sm:p-3 rounded-lg sm:rounded-xl border border-gray-100">
                                     <label class="flex items-center sm:items-start gap-1.5 sm:gap-3 cursor-pointer">
@@ -145,20 +175,46 @@
                         </div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         window.openProductDetail = (id) => {
             currentActiveProduct = products.find(p => p.id === id);
             const p = currentActiveProduct;
+            
             document.getElementById('detail-name').innerText = p.name;
-            document.getElementById('detail-price').innerText = `$${p.price.toLocaleString('es-MX')} MXN`;
+            document.getElementById('detail-category-badge').innerText = p.type || '';
+
+            const detailPrice = document.getElementById('detail-price');
+            if (p.originalPrice && p.originalPrice > p.price) {
+                detailPrice.innerHTML = `<span class="text-xl md:text-2xl text-gray-400 line-through mr-3 font-semibold">$${p.originalPrice.toLocaleString('es-MX')}</span><span class="text-metallic-red">$${p.price.toLocaleString('es-MX')} MXN</span>`;
+            } else {
+                detailPrice.innerHTML = `$${p.price.toLocaleString('es-MX')} MXN`;
+            }
+
             document.getElementById('detail-desc').innerText = p.description || "Calentador Krüger con ingeniería alemana de máxima eficiencia y ahorro de gas comprobado. Construcción reforzada para larga durabilidad y tecnología de temperatura constante.";
             document.getElementById('detail-main-img').src = p.image;
+            
+            // Renderizar selector de gas dinámico en el modal
+            const pTypeLower = (p.type || '').toLowerCase();
+            const needsGas = pTypeLower.includes('silver') || pTypeLower.includes('platinum') || pTypeLower.includes('instantáneo') || pTypeLower.includes('instantaneo') || pTypeLower.includes('parrilla');
+            const detailGasContainer = document.getElementById('detail-gas-container');
+            if(needsGas) {
+                detailGasContainer.innerHTML = `
+                    <div class="mb-4">
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Selecciona el tipo de gas:</label>
+                        <select id="detail-gas-select" class="w-full font-bold border border-gray-200 rounded-xl p-3 outline-none focus:border-metallic-blue focus:ring-1 focus:ring-metallic-blue bg-gray-50 text-gray-700">
+                            <option value="Gas LP">🔥 Gas LP</option>
+                            <option value="Gas Natural">🔥 Gas Natural</option>
+                        </select>
+                    </div>
+                `;
+            } else { detailGasContainer.innerHTML = ''; }
+
             const installContainer = document.getElementById('detail-install-container');
             if(p.installPrice > 0) {
                 installContainer.innerHTML = `
-                    <div class="mt-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                    <div class="mb-6 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
                         <label class="flex items-start gap-3 cursor-pointer">
                             <input type="checkbox" id="detail-install-check" onchange="if(this.checked) { if(!confirm('⚠️ ATENCIÓN: El servicio de instalación EXCLUSIVAMENTE tiene cobertura en la ciudad de León, Guanajuato.\\n\\n¿Confirmas que el domicilio de instalación se encuentra en León, Gto?')) this.checked = false; }" class="mt-1 w-5 h-5 text-metallic-blue rounded border-gray-300">
                             <span class="text-sm text-gray-700 font-medium">
@@ -169,6 +225,7 @@
                     </div>
                 `;
             } else { installContainer.innerHTML = ''; }
+            
             detailModal.classList.remove('hidden');
         };
 
@@ -178,11 +235,15 @@
             const p = currentActiveProduct;
             const installCheck = document.getElementById('detail-install-check');
             const wantsInstall = installCheck ? installCheck.checked : false;
-            const cartItemId = p.id + (wantsInstall ? '-with-install' : '');
+            const gasSelect = document.getElementById('detail-gas-select');
+            const gasType = gasSelect ? gasSelect.value : null;
+            
+            // Creamos un ID único que incluya si lleva instalación y el tipo de gas
+            const cartItemId = p.id + (wantsInstall ? '-with-install' : '') + (gasType ? '-' + gasType.replace(/\s+/g, '') : '');
             const existing = cart.find(item => item.cartItemId === cartItemId);
             
             if (existing) existing.quantity++;
-            else cart.push({ ...p, cartItemId, quantity: 1, wantsInstall });
+            else cart.push({ ...p, cartItemId, quantity: 1, wantsInstall, gasType });
             
             updateCart();
             closeProductDetail();
@@ -193,11 +254,14 @@
             const product = products.find(p => p.id === id);
             const installCheck = document.getElementById(`install-${id}`);
             const wantsInstall = installCheck ? installCheck.checked : false;
-            const cartItemId = id + (wantsInstall ? '-with-install' : '');
+            const gasSelect = document.getElementById(`gas-${id}`);
+            const gasType = gasSelect ? gasSelect.value : null;
+
+            const cartItemId = id + (wantsInstall ? '-with-install' : '') + (gasType ? '-' + gasType.replace(/\s+/g, '') : '');
             const existingItem = cart.find(item => item.cartItemId === cartItemId);
             
             if (existingItem) existingItem.quantity++;
-            else cart.push({ ...product, cartItemId, quantity: 1, wantsInstall });
+            else cart.push({ ...product, cartItemId, quantity: 1, wantsInstall, gasType });
             
             if(installCheck) installCheck.checked = false;
             updateCart();
@@ -231,6 +295,7 @@
                         <div class="flex-1 pr-6">
                             <h4 class="font-bold text-gray-800 text-sm mb-1">${item.name}</h4>
                             <p class="text-metallic-red font-bold text-lg">$${item.price.toLocaleString('es-MX')}</p>
+                            ${item.gasType ? `<span class="inline-block bg-orange-50 text-orange-600 border border-orange-100 text-[10px] font-bold px-1.5 py-0.5 rounded mb-1"><i class="fas fa-fire mr-1"></i>${item.gasType}</span><br>` : ''}
                             ${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
                             <span class="text-xs text-gray-500">Cant: ${item.quantity}</span>
                         </div>
@@ -263,7 +328,11 @@
                     <img src="${item.image}" class="w-12 h-12 object-contain bg-gray-50 rounded-lg p-1">
                     <div class="flex-1 min-w-0">
                         <h4 class="text-xs font-bold text-gray-800 leading-tight truncate">${item.name}</h4>
-                        <div class="text-[10px] text-gray-500 mt-0.5">Cant: ${item.quantity} ${item.wantsInstall ? '<span class="text-metallic-red font-bold ml-1">(+Instalación)</span>' : ''}</div>
+                        <div class="text-[10px] text-gray-500 mt-0.5">
+                            Cant: ${item.quantity} 
+                            ${item.gasType ? `<span class="text-orange-500 font-bold ml-1">(${item.gasType})</span>` : ''}
+                            ${item.wantsInstall ? '<span class="text-metallic-red font-bold ml-1">(+Instalación)</span>' : ''}
+                        </div>
                     </div>
                     <div class="text-sm font-black text-metallic-blue whitespace-nowrap">
                         $${((item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity).toLocaleString('es-MX')}
@@ -340,7 +409,6 @@
             const shippingAddress = document.getElementById('c-address').value;
             const finalInstallAddress = needsInstall ? (document.getElementById('c-same-address').checked ? shippingAddress : document.getElementById('c-install-address').value) : "";
             
-            // VALIDACIÓN ESTRICTA DE ZONA
             const addrLower = shippingAddress.toLowerCase();
             if (!addrLower.includes('mexico') && !addrLower.includes('méxico')) {
                 alert("🛑 COBERTURA INVÁLIDA: Por el momento, nuestros envíos están limitados EXCLUSIVAMENTE a la República Mexicana.");
@@ -372,7 +440,8 @@
                 needsInstall: needsInstall,
                 installAddress: finalInstallAddress,
                 installSchedule: needsInstall ? document.getElementById('c-schedule').value : "",
-                items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0 })),
+                // MANDAMOS EL TIPO DE GAS A LA BASE DE DATOS
+                items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0, gasType: i.gasType||"" })),
                 total: totalAmount,
                 createdAt: new Date()
             };
@@ -432,13 +501,15 @@
                                         
                                         localStorage.removeItem('krugerCart');
                                         cart = []; 
-                                        window.location.href = "success.html"; 
+                                        
+                                        // Seguridad: replace evita que la página actual se guarde en la flecha "atrás"
+                                        window.location.replace("success.html"); 
                                     } else if (response.status === "in_process") {
                                         alert("Tu pago está siendo revisado por el banco.");
-                                        window.location.href = "success.html";
+                                        window.location.replace("success.html");
                                     } else if (response.status === "rejected") {
                                         localStorage.setItem("krugerError", response.status_detail);
-                                        window.location.href = "error.html"; 
+                                        window.location.replace("error.html"); 
                                     }
                                 })
                                 .catch((error) => {
@@ -459,10 +530,19 @@
             } 
         });
 
+        // Eventos generales de la interfaz
         document.addEventListener("DOMContentLoaded", () => {
             updateCart(); 
             setupAutocomplete('c-address', 'address-suggestions');
             setupAutocomplete('c-install-address', 'install-address-suggestions');
+        });
+
+        // NUEVO: Prevención de caché de retroceso para proteger datos de tarjetas
+        // Si el usuario da a la "flecha de regresar" después del pago, la página se recarga forzosamente limpiando el formulario.
+        window.addEventListener("pageshow", function (event) {
+            if (event.persisted) {
+                window.location.reload();
+            }
         });
     </script>
 </head>
@@ -651,7 +731,6 @@
             <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest"><i class="fas fa-truck text-green-500 mr-1"></i> Envío Gratis a Todo México</p>
         </div>
 
-        <!-- MENÚ DE APARTADOS (FILTROS) -->
         <div class="flex overflow-x-auto gap-2 md:gap-4 mb-8 pb-4 no-scrollbar items-center md:justify-center">
             <button onclick="filterCat('Todos')" class="cat-btn active bg-metallic-blue text-white px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap shadow-md transition-all">Todos</button>
             <button onclick="filterCat('Línea Silver')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Línea Silver</button>
@@ -663,13 +742,12 @@
             <button onclick="filterCat('Accesorios')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Accesorios</button>
         </div>
         
-        <!-- GRID AJUSTADA A 2 COLUMNAS MÍNIMO -->
         <div id="products-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
-            <!-- Productos inyectados desde Firestore por JS -->
+            <!-- Productos -->
         </div>
     </main>
 
-    <!-- MODAL DE DETALLE Y FICHA TÉCNICA -->
+    <!-- MODAL DE DETALLE -->
     <div id="product-detail-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 md:p-10 backdrop-blur-md overflow-y-auto">
         <div class="bg-white rounded-3xl w-full max-w-5xl shadow-2xl relative flex flex-col md:flex-row overflow-hidden my-auto">
             <button onclick="closeProductDetail()" class="absolute top-4 right-4 text-gray-400 hover:text-metallic-red bg-white rounded-full p-2 z-10 shadow-sm"><i class="fas fa-times text-xl"></i></button>
@@ -684,10 +762,12 @@
             </div>
 
             <div class="md:w-1/2 p-8 md:p-12 flex flex-col justify-center">
-                <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 block">Tecnología Alemana</span>
+                <span id="detail-category-badge" class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 flex items-center gap-2 flex-wrap">Tecnología Alemana</span>
                 <h2 id="detail-name" class="text-3xl md:text-4xl font-black text-metallic-blue mb-4 leading-tight">Modelo</h2>
                 
-                <p id="detail-price" class="text-4xl font-black text-gray-900 mb-6">$0 MXN</p>
+                <div id="detail-price" class="text-4xl font-black text-gray-900 mb-6 flex items-baseline gap-2 flex-wrap">
+                    $0 MXN
+                </div>
                 
                 <div class="flex items-center gap-4 mb-6 text-sm">
                     <div class="flex items-center gap-2 text-green-600 font-bold bg-green-50 px-3 py-2 rounded-lg border border-green-100"><i class="fas fa-box-open"></i> En stock</div>
@@ -698,10 +778,12 @@
                     <h4 class="font-bold text-gray-900 mb-2 border-b pb-2">Acerca del equipo</h4>
                     <p id="detail-desc" class="text-gray-600 text-sm leading-relaxed"></p>
                 </div>
-
+                
+                <!-- Contenedor inyectado para el Gas Type dentro del modal -->
+                <div id="detail-gas-container"></div>
                 <div id="detail-install-container" class="mb-6"></div>
 
-                <button onclick="addDetailToCart()" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-blue-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                <button onclick="addDetailToCart()" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-blue-900/30 transform hover:-translate-y-1 flex items-center justify-center gap-2 mt-4">
                     <i class="fas fa-cart-plus"></i> Agregar al Pedido
                 </button>
             </div>
