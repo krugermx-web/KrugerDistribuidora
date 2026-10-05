@@ -69,6 +69,7 @@
         let products = [];
         let cart = JSON.parse(localStorage.getItem('krugerCart')) || [];
         let currentActiveProduct = null;
+        let activeCategory = 'Todos'; // Variable para el filtro de apartados
 
         const productsGrid = document.getElementById('products-grid');
         const cartCount = document.getElementById('cart-count');
@@ -84,34 +85,64 @@
             renderProducts();
         });
 
+        // Función para filtrar por apartados
+        window.filterCat = (cat) => {
+            activeCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(btn => {
+                if(btn.innerText === cat) {
+                    btn.className = "cat-btn active bg-metallic-blue text-white px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap shadow-md transition-all";
+                } else {
+                    btn.className = "cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all";
+                }
+            });
+            renderProducts();
+        };
+
         function renderProducts() {
             if (products.length === 0) {
                 productsGrid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-medium">Sincronizando inventario con nuestros almacenes...</div>`;
                 return;
             }
-            productsGrid.innerHTML = products.map(product => `
-                <div class="glass-card rounded-3xl overflow-hidden group hover:shadow-[0_20px_40px_rgba(0,40,85,0.1)] transition-all duration-300 relative">
-                    <div class="absolute top-4 right-4 bg-green-500 text-white text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider shadow-lg z-10 flex items-center gap-1">
-                        <i class="fas fa-truck-fast"></i> Envío Gratis
+
+            // Lógica del filtro
+            const filteredProducts = activeCategory === 'Todos' ? products : products.filter(p => {
+                const pType = (p.type || p.category || '').toLowerCase();
+                const searchCat = activeCategory.toLowerCase();
+                return pType.includes(searchCat) || searchCat.includes(pType);
+            });
+
+            if (filteredProducts.length === 0) {
+                productsGrid.innerHTML = `<div class="col-span-full text-center py-12 text-gray-400 font-medium">No hay productos en esta categoría por el momento.</div>`;
+                return;
+            }
+
+            // Adaptación de tarjeta a vista compacta de 2 columnas (Estilo ML)
+            productsGrid.innerHTML = filteredProducts.map(product => `
+                <div class="glass-card rounded-2xl md:rounded-3xl overflow-hidden group hover:shadow-[0_20px_40px_rgba(0,40,85,0.1)] transition-all duration-300 relative flex flex-col h-full">
+                    <div class="absolute top-2 right-2 bg-green-500 text-white text-[8px] sm:text-[10px] font-black px-2 py-1 rounded-full uppercase tracking-wider shadow-lg z-10 flex items-center gap-1">
+                        <i class="fas fa-truck-fast"></i> <span class="hidden sm:inline">Envío Gratis</span>
                     </div>
-                    <div onclick="openProductDetail('${product.id}')" class="relative h-72 overflow-hidden bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-8 cursor-pointer">
-                        <img src="${product.image}" alt="${product.name}" class="object-contain w-full h-full group-hover:scale-110 transition-transform duration-500 drop-shadow-2xl">
-                        <span class="absolute top-4 left-4 bg-metallic-red text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-md">${product.type}</span>
+                    <div onclick="openProductDetail('${product.id}')" class="relative h-32 sm:h-56 overflow-hidden bg-gradient-to-b from-gray-50 to-white flex items-center justify-center p-4 cursor-pointer">
+                        <img src="${product.image}" alt="${product.name}" class="object-contain w-full h-full group-hover:scale-110 transition-transform duration-500 drop-shadow-xl">
+                        <span class="absolute top-2 left-2 bg-metallic-red text-white text-[8px] sm:text-xs font-bold px-2 py-1 rounded-full uppercase tracking-widest shadow-md truncate max-w-[70%]">${product.type || ''}</span>
                     </div>
-                    <div class="p-8">
-                        <h3 class="text-2xl font-bold text-metallic-blue mb-2">${product.name}</h3>
-                        <p class="text-3xl font-black text-gray-900 mb-6">$${product.price.toLocaleString('es-MX')} <span class="text-base font-medium text-gray-500">MXN</span></p>
-                        ${(product.installPrice && product.installPrice > 0) ? `
-                            <div class="mb-4 bg-white/50 p-3 rounded-xl border border-gray-100">
-                                <label class="flex items-center gap-3 cursor-pointer">
-                                    <input type="checkbox" id="install-${product.id}" onchange="if(this.checked) { if(!confirm('⚠️ ATENCIÓN: El servicio de instalación EXCLUSIVAMENTE tiene cobertura en la ciudad de León, Guanajuato.\\n\\n¿Confirmas que el domicilio de instalación se encuentra en León, Gto?')) this.checked = false; }" class="w-5 h-5 text-metallic-blue rounded border-gray-300">
-                                    <span class="text-sm text-gray-600 font-medium">Instalación León <strong class="text-metallic-red">+$${product.installPrice.toLocaleString('es-MX')}</strong></span>
-                                </label>
-                            </div>
-                        ` : ''}
-                        <button onclick="addToCart('${product.id}')" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-semibold py-4 rounded-2xl transition-all duration-300 flex justify-center items-center gap-2 shadow-lg shadow-blue-900/20 transform hover:-translate-y-1">
-                            Agregar al carrito
-                        </button>
+                    <div class="p-3 sm:p-6 flex flex-col flex-1">
+                        <h3 class="text-xs sm:text-lg font-bold text-metallic-blue mb-1 sm:mb-2 line-clamp-2">${product.name}</h3>
+                        <p class="text-base sm:text-2xl font-black text-gray-900 mb-2 sm:mb-4">$${product.price.toLocaleString('es-MX')} <span class="text-[9px] sm:text-xs font-medium text-gray-500">MXN</span></p>
+                        
+                        <div class="mt-auto">
+                            ${(product.installPrice && product.installPrice > 0) ? `
+                                <div class="mb-2 sm:mb-4 bg-white/50 p-1.5 sm:p-3 rounded-lg sm:rounded-xl border border-gray-100">
+                                    <label class="flex items-center sm:items-start gap-1.5 sm:gap-3 cursor-pointer">
+                                        <input type="checkbox" id="install-${product.id}" onchange="if(this.checked) { if(!confirm('⚠️ ATENCIÓN: El servicio de instalación EXCLUSIVAMENTE tiene cobertura en la ciudad de León, Guanajuato.\\n\\n¿Confirmas que el domicilio de instalación se encuentra en León, Gto?')) this.checked = false; }" class="w-3.5 h-3.5 sm:w-5 sm:h-5 text-metallic-blue rounded border-gray-300">
+                                        <span class="text-[9px] sm:text-sm text-gray-600 font-medium leading-tight">Inst. León <strong class="text-metallic-red">+$${product.installPrice.toLocaleString('es-MX')}</strong></span>
+                                    </label>
+                                </div>
+                            ` : ''}
+                            <button onclick="addToCart('${product.id}')" class="w-full bg-metallic-blue hover:bg-blue-900 text-white text-[10px] sm:text-sm font-semibold py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-300 flex justify-center items-center gap-1.5 shadow-md transform hover:-translate-y-0.5">
+                                <i class="fas fa-cart-plus"></i> <span class="hidden sm:inline">Agregar al carrito</span><span class="sm:hidden">Agregar</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -275,7 +306,6 @@
                 const query = this.value;
                 if (query.length < 5) { list.classList.add('hidden'); return; }
                 timeout = setTimeout(() => {
-                    // El limitador countrycodes=mx ya fuerza resultados dentro de México
                     fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&limit=5`)
                         .then(res => res.json())
                         .then(data => {
@@ -310,12 +340,10 @@
             const shippingAddress = document.getElementById('c-address').value;
             const finalInstallAddress = needsInstall ? (document.getElementById('c-same-address').checked ? shippingAddress : document.getElementById('c-install-address').value) : "";
             
-            // =========================================================
-            // VALIDACIÓN ESTRICTA DE ZONA (ENVÍO Y LEÓN, GTO)
-            // =========================================================
+            // VALIDACIÓN ESTRICTA DE ZONA
             const addrLower = shippingAddress.toLowerCase();
             if (!addrLower.includes('mexico') && !addrLower.includes('méxico')) {
-                alert("🛑 COBERTURA INVÁLIDA: Por el momento, nuestros envíos están limitados EXCLUSIVAMENTE a la República Mexicana.\n\nAsegúrate de usar el buscador autocompletado para seleccionar una dirección válida que incluya el país.");
+                alert("🛑 COBERTURA INVÁLIDA: Por el momento, nuestros envíos están limitados EXCLUSIVAMENTE a la República Mexicana.");
                 btn.innerHTML = '<i class="fas fa-lock mr-2"></i> Proceder al Pago Seguro';
                 btn.disabled = false;
                 return;
@@ -323,7 +351,6 @@
 
             if (needsInstall) {
                 const instLower = finalInstallAddress.toLowerCase();
-                // Verificamos que contenga "Leon" Y ("Gto" o "Guanajuato") para evitar confundir con "Nuevo Leon"
                 const isLeonGto = (instLower.includes('leon') || instLower.includes('león')) && 
                                   (instLower.includes('gto') || instLower.includes('guanajuato'));
                 
@@ -334,7 +361,6 @@
                     return;
                 }
             }
-            // =========================================================
 
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
@@ -364,7 +390,6 @@
                 const cleanAmount = Number(totalAmount);
                 const bricksBuilder = mp.bricks();
                 
-                // === AQUÍ ESTABA EL ERROR DE LAS LLAVES QUE ARREGLAMOS ===
                 bricksBuilder.create("payment", "wallet_container", {
                     initialization: { amount: cleanAmount, preferenceId: preference.id },
                     customization: {
@@ -620,13 +645,26 @@
     </section>
 
     <main id="catalogo" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-20">
-        <div class="text-center mb-16">
+        <div class="text-center mb-8">
             <h2 class="text-4xl md:text-5xl font-black text-metallic-blue mb-4">Elige tu Krüger</h2>
             <div class="h-1.5 w-24 bg-gradient-to-r from-metallic-red to-red-400 mx-auto rounded-full"></div>
             <p class="mt-4 text-gray-500 font-bold uppercase tracking-widest"><i class="fas fa-truck text-green-500 mr-1"></i> Envío Gratis a Todo México</p>
         </div>
+
+        <!-- MENÚ DE APARTADOS (FILTROS) -->
+        <div class="flex overflow-x-auto gap-2 md:gap-4 mb-8 pb-4 no-scrollbar items-center md:justify-center">
+            <button onclick="filterCat('Todos')" class="cat-btn active bg-metallic-blue text-white px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap shadow-md transition-all">Todos</button>
+            <button onclick="filterCat('Línea Silver')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Línea Silver</button>
+            <button onclick="filterCat('Línea Platinum')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Línea Platinum</button>
+            <button onclick="filterCat('Instantáneos')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Instantáneos</button>
+            <button onclick="filterCat('Solares')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Solares</button>
+            <button onclick="filterCat('Eléctricos')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Eléctricos</button>
+            <button onclick="filterCat('Parrillas')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Parrillas</button>
+            <button onclick="filterCat('Accesorios')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Accesorios</button>
+        </div>
         
-        <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+        <!-- GRID AJUSTADA A 2 COLUMNAS MÍNIMO -->
+        <div id="products-grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-6">
             <!-- Productos inyectados desde Firestore por JS -->
         </div>
     </main>
@@ -690,7 +728,7 @@
         </div>
     </div>
 
-    <!-- MODAL CHECKOUT CON FOTOS Y DESGLOSE DE IMPUESTOS -->
+    <!-- MODAL CHECKOUT -->
     <div id="checkout-modal" class="fixed inset-0 bg-metallic-blue/90 z-50 hidden flex items-center justify-center p-4 backdrop-blur-md">
         <div class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-y-auto flex flex-col md:flex-row shadow-2xl">
             
