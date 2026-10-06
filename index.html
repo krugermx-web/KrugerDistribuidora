@@ -87,7 +87,7 @@
         window.filterCat = (cat) => {
             activeCategory = cat;
             document.querySelectorAll('.cat-btn').forEach(btn => {
-                if(btn.innerText === cat) {
+                if(btn.innerText === cat || (cat === 'Aires Acondicionados Inverter' && btn.innerText === 'Aires Inverter')) {
                     btn.className = "cat-btn active bg-metallic-blue text-white px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap shadow-md transition-all";
                 } else {
                     btn.className = "cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all";
@@ -737,6 +737,8 @@
             <button onclick="filterCat('Instantáneos')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Instantáneos</button>
             <button onclick="filterCat('Solares')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Solares</button>
             <button onclick="filterCat('Eléctricos')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Eléctricos</button>
+            <!-- NUEVA CATEGORÍA DE AIRES ACONDICIONADOS -->
+            <button onclick="filterCat('Aires Acondicionados Inverter')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Aires Inverter</button>
             <button onclick="filterCat('Parrillas')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Parrillas</button>
             <button onclick="filterCat('Accesorios')" class="cat-btn bg-white text-gray-600 hover:text-metallic-blue px-4 md:px-6 py-2 rounded-full font-bold text-xs md:text-sm whitespace-nowrap border border-gray-200 hover:border-metallic-blue transition-all">Accesorios</button>
         </div>
