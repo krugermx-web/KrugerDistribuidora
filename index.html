@@ -29,6 +29,8 @@
         .glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5); box-shadow: 0 8px 32px 0 rgba(0, 40, 85, 0.05); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .snap-x { scroll-snap-type: x mandatory; }
+        .snap-start { scroll-snap-align: start; }
     </style>
 
     <script type="module">
@@ -65,6 +67,7 @@
         onSnapshot(collection(db, "products"), (snapshot) => {
             products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             renderProducts();
+            updateCart();
         });
 
         window.filterCat = (cat) => {
@@ -102,7 +105,6 @@
                 
                 let selectsHtml = '';
                 
-                // Lógica de Medidas Personalizadas (Nuevo)
                 if (product.sizes && product.sizes.trim() !== '') {
                     const sizeOptions = product.sizes.split(',').map(s => s.trim()).filter(s => s);
                     if (sizeOptions.length > 0) {
@@ -116,7 +118,6 @@
                     }
                 }
 
-                // Lógica de Gas
                 if (needsGas) {
                     selectsHtml += `
                         <div class="mb-2 sm:mb-3">
@@ -187,7 +188,6 @@
             const detailSelectorsContainer = document.getElementById('detail-selectors-container');
             let selectsHtml = '';
 
-            // Medidas en el modal
             if (p.sizes && p.sizes.trim() !== '') {
                 const sizeOptions = p.sizes.split(',').map(s => s.trim()).filter(s => s);
                 if (sizeOptions.length > 0) {
@@ -202,7 +202,6 @@
                 }
             }
 
-            // Gas en el modal
             const pTypeLower = (p.type || '').toLowerCase();
             const needsGas = pTypeLower.includes('silver') || pTypeLower.includes('platino') || pTypeLower.includes('instantáneo') || pTypeLower.includes('instantaneo') || pTypeLower.includes('parrilla');
             if(needsGas) {
@@ -235,6 +234,8 @@
 
         window.closeProductDetail = () => { detailModal.classList.add('hidden'); currentActiveProduct = null; };
 
+        const cleanID = (str) => str ? str.replace(/[^a-zA-Z0-9-]/g, '') : '';
+
         window.addDetailToCart = () => {
             const p = currentActiveProduct;
             const installCheck = document.getElementById('detail-install-check');
@@ -246,7 +247,7 @@
             const sizeSelect = document.getElementById('detail-size-select');
             const selectedSize = sizeSelect ? sizeSelect.value : null;
             
-            const cartItemId = p.id + (wantsInstall ? '-with-install' : '') + (gasType ? '-' + gasType.replace(/\s+/g, '') : '') + (selectedSize ? '-' + selectedSize.replace(/\s+/g, '') : '');
+            const cartItemId = p.id + (wantsInstall ? '-inst' : '') + (gasType ? '-' + cleanID(gasType) : '') + (selectedSize ? '-' + cleanID(selectedSize) : '');
             const existing = cart.find(item => item.cartItemId === cartItemId);
             
             if (existing) existing.quantity++;
@@ -268,7 +269,7 @@
             const sizeSelect = document.getElementById(`size-${id}`);
             const selectedSize = sizeSelect ? sizeSelect.value : null;
 
-            const cartItemId = id + (wantsInstall ? '-with-install' : '') + (gasType ? '-' + gasType.replace(/\s+/g, '') : '') + (selectedSize ? '-' + selectedSize.replace(/\s+/g, '') : '');
+            const cartItemId = id + (wantsInstall ? '-inst' : '') + (gasType ? '-' + cleanID(gasType) : '') + (selectedSize ? '-' + cleanID(selectedSize) : '');
             const existingItem = cart.find(item => item.cartItemId === cartItemId);
             
             if (existingItem) existingItem.quantity++;
@@ -277,6 +278,29 @@
             if(installCheck) installCheck.checked = false;
             updateCart();
             openCart();
+        };
+
+        window.addUpsellToCart = (id) => {
+            const product = products.find(p => p.id === id);
+            if(!product) return;
+            
+            let selectedSize = null;
+            const sizeSelect = document.getElementById(`upsell-size-${id}`);
+            if (sizeSelect) {
+                if (!sizeSelect.value) {
+                    alert('Por favor selecciona una medida antes de agregar.');
+                    return;
+                }
+                selectedSize = sizeSelect.value;
+            }
+
+            const cartItemId = id + (selectedSize ? '-' + cleanID(selectedSize) : '');
+            const existingItem = cart.find(item => item.cartItemId === cartItemId);
+            
+            if (existingItem) existingItem.quantity++;
+            else cart.push({ ...product, cartItemId, quantity: 1, wantsInstall: false, gasType: null, size: selectedSize });
+            
+            updateCart();
         };
 
         window.removeFromCart = (cartItemId) => {
@@ -296,7 +320,10 @@
             if (cart.length === 0) {
                 cartItemsList.innerHTML = `<p class="text-gray-500 text-center py-10">Tu carrito está vacío</p>`;
             } else {
-                cartItemsList.innerHTML = cart.map(item => `
+                cartItemsList.innerHTML = cart.map(item => {
+                    const safeRemoveId = item.cartItemId.replace(/"/g, '&quot;').replace(/'/g, "\\'");
+                    
+                    return `
                     <div class="flex items-center gap-4 bg-white p-4 rounded-2xl shadow-sm mb-4 border border-gray-50 relative">
                         <img src="${item.image}" class="w-16 h-16 object-contain rounded-xl bg-gray-50 p-2">
                         <div class="flex-1 pr-6">
@@ -307,10 +334,57 @@
                             ${item.wantsInstall ? `<p class="text-xs text-metallic-blue font-bold">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</p>` : ''}
                             <span class="text-xs text-gray-500">Cant: ${item.quantity}</span>
                         </div>
-                        <button onclick="removeFromCart('${item.cartItemId}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"><i class="fas fa-trash-alt"></i></button>
+                        <button onclick="removeFromCart('${safeRemoveId}')" class="absolute top-4 right-4 text-gray-300 hover:text-red-500 transition-colors"><i class="fas fa-trash-alt"></i></button>
                     </div>
-                `).join('');
+                `}).join('');
             }
+
+            // Lógica Upsell: Solo mostrar si hay un calentador en el carrito
+            const upsellContainer = document.getElementById('cart-upsell-container');
+            const upsellItemsList = document.getElementById('cart-upsell-items');
+            
+            // Verificamos si en el carrito hay al menos un producto que sea un calentador
+            const hasHeater = cart.some(item => {
+                const typeStr = (item.type || item.category || '').toLowerCase();
+                return typeStr.includes('platino') || 
+                       typeStr.includes('silver') || 
+                       typeStr.includes('instantáneo') || 
+                       typeStr.includes('instantaneo') || 
+                       typeStr.includes('eléctrico') || 
+                       typeStr.includes('electrico');
+            });
+
+            if (cart.length > 0 && products.length > 0 && hasHeater) {
+                const accessories = products.filter(p => (p.type || p.category || '').toLowerCase().includes('accesorio'));
+                
+                if (accessories.length > 0) {
+                    upsellContainer.classList.remove('hidden');
+                    upsellItemsList.innerHTML = accessories.map(p => {
+                        let sizeHtml = '';
+                        if (p.sizes && p.sizes.trim() !== '') {
+                            const sizeOptions = p.sizes.split(',').map(s => s.trim()).filter(s => s);
+                            if (sizeOptions.length > 0) {
+                                sizeHtml = `<select id="upsell-size-${p.id}" class="w-full text-[9px] mb-2 p-1 border border-purple-200 rounded outline-none text-purple-800 bg-purple-50">
+                                    <option value="">Medida...</option>
+                                    ${sizeOptions.map(s => `<option value="${s}">${s}</option>`).join('')}
+                                </select>`;
+                            }
+                        }
+
+                        return `
+                            <div class="min-w-[130px] w-[130px] bg-white border border-gray-200 rounded-xl p-3 flex flex-col snap-start shadow-sm">
+                                <img src="${p.image}" class="h-14 w-full object-contain mb-2">
+                                <h5 class="text-[10px] font-bold text-metallic-blue leading-tight mb-1 line-clamp-2">${p.name}</h5>
+                                <div class="mt-auto">
+                                    <span class="text-xs font-black text-metallic-red block mb-1">$${p.price.toLocaleString('es-MX')}</span>
+                                    ${sizeHtml}
+                                    <button onclick="addUpsellToCart('${p.id}')" class="w-full bg-metallic-blue text-white text-[10px] py-1.5 rounded-lg font-bold hover:bg-blue-800 transition shadow-sm"><i class="fas fa-plus"></i> Agregar</button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else { upsellContainer.classList.add('hidden'); }
+            } else { upsellContainer.classList.add('hidden'); }
         }
 
         window.openCart = () => cartModal.classList.remove('translate-x-full');
@@ -654,9 +728,23 @@
 
     <!-- MODAL CARRITO -->
     <div id="cart-modal" class="fixed inset-y-0 right-0 w-full max-w-md bg-[#F8F9FA] shadow-2xl z-50 transform translate-x-full transition-transform duration-500 ease-out flex flex-col border-l border-gray-200">
-        <div class="p-6 bg-white border-b border-gray-100 flex justify-between items-center"><h2 class="text-2xl font-black text-metallic-blue">Tu Pedido</h2><button onclick="closeCart()" class="text-gray-400 hover:text-metallic-red transition-colors bg-gray-50 p-2 rounded-full"><i class="fas fa-times text-xl"></i></button></div>
-        <div id="cart-items" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
-        <div class="p-8 bg-white border-t border-gray-100 shadow-[0_-10px_40px_rgb(0,0,0,0.05)]">
+        <div class="p-6 bg-white border-b border-gray-100 flex justify-between items-center">
+            <h2 class="text-2xl font-black text-metallic-blue">Tu Pedido</h2>
+            <button onclick="closeCart()" class="text-gray-400 hover:text-metallic-red transition-colors bg-gray-50 p-2 rounded-full">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto flex flex-col">
+            <div id="cart-items" class="p-6 space-y-4"></div>
+            
+            <div id="cart-upsell-container" class="hidden mt-auto bg-blue-50/50 p-4 border-y border-blue-100">
+                <h4 class="text-xs font-bold text-metallic-blue mb-3 uppercase tracking-wider"><i class="fas fa-tools mr-1"></i> Completa tu instalación</h4>
+                <div id="cart-upsell-items" class="flex gap-3 overflow-x-auto pb-2 snap-x no-scrollbar"></div>
+            </div>
+        </div>
+
+        <div class="p-8 bg-white shadow-[0_-10px_40px_rgb(0,0,0,0.05)] z-10">
             <div class="flex justify-between text-xl font-bold mb-6 text-metallic-blue"><span>Total estimado:</span><span id="cart-total" class="text-2xl">$0</span></div>
             <button onclick="openCheckout()" class="w-full bg-gradient-to-r from-metallic-red to-red-600 hover:from-red-700 hover:to-red-800 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-red-500/30 transform hover:-translate-y-1">Finalizar Compra</button>
         </div>
