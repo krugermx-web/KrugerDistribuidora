@@ -35,7 +35,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCSdcopQjbZoYwcgwjB8uhosN-yY11kMdQ",
@@ -337,7 +337,6 @@
                 `}).join('');
             }
 
-            // Lógica Upsell
             const upsellContainer = document.getElementById('cart-upsell-container');
             const upsellItemsList = document.getElementById('cart-upsell-items');
             
@@ -431,9 +430,6 @@
             else { el.classList.remove('hidden'); input.setAttribute('required', 'true'); }
         });
 
-        // =================================================================
-        // INICIALIZADOR DE GOOGLE MAPS
-        // =================================================================
         window.iniciarGoogleMaps = function() {
             const opciones = {
                 componentRestrictions: { country: "mx" },
@@ -449,12 +445,12 @@
         };
 
         // =================================================================
-        // PROCESAR PAGO 
+        // PROCESAR PAGO Y GUARDAR EN FIREBASE DE FORMA INMEDIATA
         // =================================================================
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-process-order');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Conectando de forma segura con Clip...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Registrando orden y conectando con Clip...';
             btn.disabled = true;
 
             const needsInstall = cart.some(i => i.wantsInstall);
@@ -478,6 +474,7 @@
 
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
+            // Estructura completa de la orden
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
@@ -488,32 +485,32 @@
                 installSchedule: needsInstall ? document.getElementById('c-schedule').value : "",
                 items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0, gasType: i.gasType||"", size: i.size||"" })),
                 total: totalAmount,
-                createdAt: new Date(),
-                status: "Pagado (Clip)"
+                createdAt: { seconds: Math.floor(Date.now() / 1000) },
+                status: "Pendiente de Pago"
             };
 
             try {
+                // 1. GUARDAR EN FIREBASE DE INMEDIATO CON TODOS LOS DATOS
+                const nuevaOrdenRef = await addDoc(collection(db, "orders"), orderData);
+                const orderId = nuevaOrdenRef.id;
+
+                // 2. LLAMAR AL SERVIDOR DE RENDER PARA GENERAR EL LINK DE CLIP PASANDO EL orderId
                 const response = await fetch("https://servidor-kruger.onrender.com/crear-pago-clip", {
                     method: "POST", 
                     headers: { "Content-Type": "application/json" }, 
-                    body: JSON.stringify({ items: orderData.items, total: totalAmount, ordenKruger: orderData })
+                    body: JSON.stringify({ 
+                        total: totalAmount, 
+                        ordenKruger: {
+                            orderId: orderId,
+                            customerEmail: orderData.customerEmail
+                        } 
+                    })
                 });
 
                 const data = await response.json();
 
                 if (data.checkoutUrl) {
-                    
-                    // 1. Guardamos la orden en el navegador temporalmente.
-                    // YA NO SE GUARDA EN FIREBASE AQUÍ para no hacer basura en tu panel.
-                    localStorage.setItem("ordenKruger", JSON.stringify(orderData));
-                    
-                    // Nota: Tampoco vaciamos el carrito aquí por si le dan "Atrás".
-                    
-                    // 2. Redirección oficial y limpia
-                    // Si pagan bien, Clip los manda a success.html automáticamente.
-                    // Si le dan atrás o cancelan, regresan aquí y su carrito sigue intacto.
-                    window.location.href = data.checkoutUrl;
-
+                    window.location.href = data.checkoutUrl; // Redirige a Clip de forma segura
                 } else {
                     alert("Error de Clip al generar el enlace de pago. Intenta nuevamente.");
                     btn.innerHTML = '<i class="fas fa-shield-alt mr-2"></i> Pagar de forma segura con Clip'; 
