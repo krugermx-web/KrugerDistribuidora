@@ -10,6 +10,9 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
 
+    <!-- SCRIPT OFICIAL DE GOOGLE MAPS CON TU CLAVE -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCVjVzEm4cCpEMUWFuA3oT3GPJyKWVkgZg&libraries=places&callback=iniciarGoogleMaps"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -32,7 +35,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCSdcopQjbZoYwcgwjB8uhosN-yY11kMdQ",
@@ -334,18 +337,13 @@
                 `}).join('');
             }
 
-            // Lógica Upsell: Solo mostrar si hay un calentador en el carrito
+            // Lógica Upsell
             const upsellContainer = document.getElementById('cart-upsell-container');
             const upsellItemsList = document.getElementById('cart-upsell-items');
             
             const hasHeater = cart.some(item => {
                 const typeStr = (item.type || item.category || '').toLowerCase();
-                return typeStr.includes('platino') || 
-                       typeStr.includes('silver') || 
-                       typeStr.includes('instantáneo') || 
-                       typeStr.includes('instantaneo') || 
-                       typeStr.includes('eléctrico') || 
-                       typeStr.includes('electrico');
+                return typeStr.includes('platino') || typeStr.includes('silver') || typeStr.includes('instantáneo') || typeStr.includes('instantaneo') || typeStr.includes('eléctrico') || typeStr.includes('electrico');
             });
 
             if (cart.length > 0 && products.length > 0 && hasHeater) {
@@ -358,10 +356,7 @@
                         if (p.sizes && p.sizes.trim() !== '') {
                             const sizeOptions = p.sizes.split(',').map(s => s.trim()).filter(s => s);
                             if (sizeOptions.length > 0) {
-                                sizeHtml = `<select id="upsell-size-${p.id}" class="w-full text-[9px] mb-2 p-1 border border-purple-200 rounded outline-none text-purple-800 bg-purple-50">
-                                    <option value="">Medida...</option>
-                                    ${sizeOptions.map(s => `<option value="${s}">${s}</option>`).join('')}
-                                </select>`;
+                                sizeHtml = `<select id="upsell-size-${p.id}" class="w-full text-[9px] mb-2 p-1 border border-purple-200 rounded outline-none text-purple-800 bg-purple-50"><option value="">Medida...</option>${sizeOptions.map(s => `<option value="${s}">${s}</option>`).join('')}</select>`;
                             }
                         }
 
@@ -436,35 +431,26 @@
             else { el.classList.remove('hidden'); input.setAttribute('required', 'true'); }
         });
 
-        function setupAutocomplete(inputId, listId) {
-            const input = document.getElementById(inputId);
-            const list = document.getElementById(listId);
-            let timeout = null;
-            input.addEventListener('input', function() {
-                clearTimeout(timeout);
-                const query = this.value;
-                if (query.length < 5) { list.classList.add('hidden'); return; }
-                timeout = setTimeout(() => {
-                    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=mx&limit=5`)
-                        .then(res => res.json())
-                        .then(data => {
-                            list.innerHTML = '';
-                            if (data.length > 0) {
-                                data.forEach(item => {
-                                    const li = document.createElement('li');
-                                    li.className = 'p-3 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-sm text-gray-700 flex items-start gap-2';
-                                    li.innerHTML = `<i class="fas fa-map-marker-alt text-metallic-red mt-1"></i> <span>${item.display_name}</span>`;
-                                    li.onclick = () => { input.value = item.display_name; list.classList.add('hidden'); };
-                                    list.appendChild(li);
-                                });
-                                list.classList.remove('hidden');
-                            } else { list.classList.add('hidden'); }
-                        });
-                }, 500); 
-            });
-            document.addEventListener('click', function(e) { if (e.target !== input && e.target !== list) list.classList.add('hidden'); });
-        }
+        // =================================================================
+        // INICIALIZADOR DE GOOGLE MAPS
+        // =================================================================
+        window.iniciarGoogleMaps = function() {
+            const opciones = {
+                componentRestrictions: { country: "mx" },
+                fields: ["formatted_address", "geometry", "name"],
+                types: ["address"]
+            };
 
+            const inputEnvio = document.getElementById('c-address');
+            if(inputEnvio) { new google.maps.places.Autocomplete(inputEnvio, opciones); }
+
+            const inputInstalacion = document.getElementById('c-install-address');
+            if(inputInstalacion) { new google.maps.places.Autocomplete(inputInstalacion, opciones); }
+        };
+
+        // =================================================================
+        // PROCESAR PAGO 
+        // =================================================================
         document.getElementById('checkout-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('btn-process-order');
@@ -503,51 +489,30 @@
                 items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0, gasType: i.gasType||"", size: i.size||"" })),
                 total: totalAmount,
                 createdAt: new Date(),
-                status: "Pendiente de pago (Clip)"
+                status: "Pagado (Clip)"
             };
 
             try {
                 const response = await fetch("https://servidor-kruger.onrender.com/crear-pago-clip", {
                     method: "POST", 
                     headers: { "Content-Type": "application/json" }, 
-                    body: JSON.stringify({ 
-                        items: orderData.items,
-                        total: totalAmount,
-                        ordenKruger: orderData
-                    })
+                    body: JSON.stringify({ items: orderData.items, total: totalAmount, ordenKruger: orderData })
                 });
 
                 const data = await response.json();
 
                 if (data.checkoutUrl) {
-                    // Guardamos la orden inicial en Firebase para no perderla
-                    try {
-                        await addDoc(collection(db, "orders"), orderData);
-                    } catch(err) { console.error("Error al guardar en Firebase:", err); }
-
-                    // Preparamos el localStorage para la página de éxito
-                    localStorage.setItem("ordenKruger", JSON.stringify({ email: orderData.customerEmail, total: totalAmount, items: cart }));
-                    localStorage.removeItem('krugerCart');
                     
-                    // TRUCO: Abrimos Clip en una ventanita flotante para no salir de la página
-                    const ancho = 450;
-                    const alto = 750;
-                    const left = (window.screen.width / 2) - (ancho / 2);
-                    const top = (window.screen.height / 2) - (alto / 2);
+                    // 1. Guardamos la orden en el navegador temporalmente.
+                    // YA NO SE GUARDA EN FIREBASE AQUÍ para no hacer basura en tu panel.
+                    localStorage.setItem("ordenKruger", JSON.stringify(orderData));
                     
-                    const clipPopup = window.open(data.checkoutUrl, "PagoClip", `width=${ancho},height=${alto},top=${top},left=${left},toolbar=no,menubar=no,scrollbars=yes,resizable=no`);
+                    // Nota: Tampoco vaciamos el carrito aquí por si le dan "Atrás".
                     
-                    // Cambiamos el texto del botón mientras el cliente paga en la ventanita
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Esperando tu pago en la ventana...';
-                    
-                    // Tu página se queda "vigilando" si el cliente ya cerró la ventanita
-                    const checkPopup = setInterval(() => {
-                        if (!clipPopup || clipPopup.closed) {
-                            clearInterval(checkPopup);
-                            // En cuanto se cierra el cuadrito de Clip, tu página principal se va a éxito
-                            window.location.href = "success.html";
-                        }
-                    }, 1000);
+                    // 2. Redirección oficial y limpia
+                    // Si pagan bien, Clip los manda a success.html automáticamente.
+                    // Si le dan atrás o cancelan, regresan aquí y su carrito sigue intacto.
+                    window.location.href = data.checkoutUrl;
 
                 } else {
                     alert("Error de Clip al generar el enlace de pago. Intenta nuevamente.");
@@ -562,7 +527,7 @@
             } 
         });
 
-        document.addEventListener("DOMContentLoaded", () => { updateCart(); setupAutocomplete('c-address', 'address-suggestions'); setupAutocomplete('c-install-address', 'install-address-suggestions'); });
+        document.addEventListener("DOMContentLoaded", () => { updateCart(); });
         window.addEventListener("pageshow", function (event) { if (event.persisted) window.location.reload(); });
     </script>
 </head>
@@ -768,7 +733,7 @@
                 <button type="button" onclick="closeCheckout()" class="text-sm text-gray-500 font-bold hover:text-metallic-red text-left mt-6 flex items-center"><i class="fas fa-arrow-left mr-2"></i> Volver al carrito</button>
             </div>
 
-            <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto">
+            <div class="p-8 md:p-10 md:w-2/3 overflow-y-auto relative">
                 <h3 class="text-2xl font-black text-gray-800 mb-6">Completa tus datos</h3>
                 <form id="checkout-form" class="space-y-5">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -778,15 +743,13 @@
                     <div><label class="block text-sm font-bold text-gray-700 mb-1">Correo Electrónico</label><input type="email" id="c-email" required placeholder="ejemplo@correo.com" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none"></div>
                     <div class="relative">
                         <label class="block text-sm font-bold text-gray-700 mb-1">Dirección de Envío Completa</label>
-                        <input type="text" id="c-address" required placeholder="Empieza a escribir tu calle..." autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
-                        <ul id="address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
+                        <input type="text" id="c-address" required placeholder="Escribe tu calle y estado..." autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue pr-10">
                     </div>
                     <div id="installation-fields" class="hidden bg-blue-50/50 p-6 rounded-2xl border border-blue-100 mt-4">
                         <h4 class="text-sm font-bold text-metallic-blue mb-4"><i class="fas fa-tools mr-1"></i> Detalles de Instalación</h4>
                         <label class="flex items-center gap-2 mb-4 cursor-pointer"><input type="checkbox" id="c-same-address" checked class="w-4 h-4 text-metallic-blue"><span class="text-sm text-gray-700 font-medium">Misma dirección de envío</span></label>
                         <div id="c-install-address-container" class="relative hidden mb-4">
-                            <input type="text" id="c-install-address" placeholder="Escribe la dirección diferente" autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue">
-                            <ul id="install-address-suggestions" class="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 shadow-2xl hidden max-h-48 overflow-y-auto"></ul>
+                            <input type="text" id="c-install-address" placeholder="Escribe la dirección diferente" autocomplete="off" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none focus:border-metallic-blue pr-10">
                         </div>
                         <div><label class="block text-sm font-bold text-gray-700 mb-1">Fecha y Hora Preferida</label><input type="datetime-local" id="c-schedule" class="w-full border border-gray-200 rounded-xl p-3 bg-white outline-none cursor-pointer"></div>
                     </div>
