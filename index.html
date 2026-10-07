@@ -486,7 +486,7 @@
                 items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0, gasType: i.gasType||"", size: i.size||"" })),
                 total: totalAmount,
                 createdAt: { seconds: Math.floor(Date.now() / 1000) },
-                status: "Pagado"
+                status: "Pendiente de Pago"
             };
 
             try {
