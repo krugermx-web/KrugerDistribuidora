@@ -474,7 +474,7 @@
 
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
-            // Estructura completa de la orden
+            // Estructura completa de la orden (Con status "Pagado" para que el admin la muestre de inmediato)
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
@@ -486,7 +486,7 @@
                 items: cart.map(i => ({ name: i.name, price: i.price, quantity: i.quantity, wantsInstall: i.wantsInstall||false, installPrice: i.installPrice||0, gasType: i.gasType||"", size: i.size||"" })),
                 total: totalAmount,
                 createdAt: { seconds: Math.floor(Date.now() / 1000) },
-                status: "Pendiente de Pago"
+                status: "Pagado"
             };
 
             try {
