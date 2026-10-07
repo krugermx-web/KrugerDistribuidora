@@ -21,54 +21,27 @@
     </script>
     <style>
         body { font-family: 'Outfit', sans-serif; }
-        
-        /* CÓDIGO PARA LA ANIMACIÓN DE LA PALOMITA DIBUJADA A MANO */
         .path-check {
             stroke-dasharray: 100;
             stroke-dashoffset: 100;
             animation: drawCheck 0.6s ease-out forwards;
-            animation-delay: 0.2s; /* Ligero retraso para que alcance a verse al cargar la página */
+            animation-delay: 0.2s;
         }
-        @keyframes drawCheck {
-            to { stroke-dashoffset: 0; }
-        }
+        @keyframes drawCheck { to { stroke-dashoffset: 0; } }
     </style>
 
-    <!-- FIREBASE: SUBIDA OFICIAL DE LA ORDEN AL APROBARSE -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+    <!-- SCRIPT LIMPIO: SOLO LEE EL MONTO Y VACÍA EL CARRITO -->
+    <script>
+        // Si la abrieron dentro de un Iframe, obligamos a que se haga pantalla completa
+        if (window !== window.top) { window.top.location = window.location; }
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCSdcopQjbZoYwcgwjB8uhosN-yY11kMdQ",
-            authDomain: "tienda-kruger.firebaseapp.com",
-            projectId: "tienda-kruger",
-            storageBucket: "tienda-kruger.firebasestorage.app",
-            messagingSenderId: "675310203131",
-            appId: "1:675310203131:web:aaec21767633143169805e"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // Al cargar la página, registramos la orden
-        document.addEventListener("DOMContentLoaded", async () => {
+        document.addEventListener("DOMContentLoaded", () => {
             const ordenGuardada = JSON.parse(localStorage.getItem("ordenKruger"));
-            const yaRegistrada = localStorage.getItem("ordenKrugerRegistradaEnDB");
-
+            
             if (ordenGuardada) {
                 document.getElementById('monto-total').innerText = `$${ordenGuardada.total.toLocaleString('es-MX')} MXN`;
-
-                // Si no se ha guardado en Firebase, la subimos ahora
-                if (!yaRegistrada) {
-                    try {
-                        await addDoc(collection(db, "orders"), ordenGuardada);
-                        console.log("Orden guardada exitosamente en la base de datos.");
-                        // Ponemos un candado para que no se duplique si el cliente recarga la página
-                        localStorage.setItem("ordenKrugerRegistradaEnDB", "true");
-                    } catch (error) {
-                        console.error("Error al subir la orden a Firebase:", error);
-                    }
-                }
+                // Vaciamos el carrito para que no lo vuelvan a comprar por error
+                localStorage.removeItem("krugerCart");
             } else {
                 document.getElementById('monto-total').innerText = "Orden no encontrada";
             }
@@ -95,7 +68,6 @@
                 <span class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-2">Distribuidor Autorizado</span>
             </div>
             
-            <!-- NUEVA ANIMACIÓN: Círculo verde con palomita blanca que se dibuja sola -->
             <div class="w-24 h-24 bg-gradient-to-tr from-green-400 to-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 transform hover:scale-105 transition-transform">
                 <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path class="path-check" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
@@ -119,7 +91,6 @@
                     <i class="fas fa-file-invoice text-xl"></i> Descargar Comprobante (PDF)
                 </button>
                 
-                <!-- BOTÓN CORREGIDO CON ENLACE ABSOLUTO -->
                 <a href="https://krugermx-web.github.io/KrugerDistribuidora/" class="w-full bg-white border-2 border-gray-200 hover:border-metallic-blue hover:text-metallic-blue text-gray-600 font-bold py-4 rounded-2xl text-lg transition-all flex justify-center items-center gap-2 mt-2">
                     <i class="fas fa-home"></i> Volver a la Tienda
                 </a>
@@ -137,24 +108,18 @@
                 return;
             }
 
-            // Inicializar jsPDF
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Variables de cálculo (Desglose de IVA)
             const total = ordenGuardada.total;
             const subtotal = total / 1.16;
             const iva = total - subtotal;
-            
-            // Folio aleatorio para el recibo (Simulación)
             const folioNumber = Math.floor(Math.random() * 900000) + 100000;
             const fechaActual = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-            // 1. DIBUJAR ENCABEZADO (CABECERA AZUL OSCURA)
-            doc.setFillColor(0, 40, 85); // Color Azul Metálico Krüger
+            doc.setFillColor(0, 40, 85); 
             doc.rect(0, 0, 210, 45, 'F'); 
 
-            // LOGOTIPO EN PDF
             const logoPdf = document.getElementById('logo-blanco-pdf');
             if (logoPdf && logoPdf.complete && logoPdf.naturalWidth > 0) {
                 try {
@@ -165,12 +130,8 @@
                     ctx.drawImage(logoPdf, 0, 0);
                     const imgData = canvas.toDataURL('image/png');
                     doc.addImage(imgData, 'PNG', 14, 12, 38, 12);
-                } catch(e) {
-                    imprimirTextoLogo(doc);
-                }
-            } else {
-                imprimirTextoLogo(doc);
-            }
+                } catch(e) { imprimirTextoLogo(doc); }
+            } else { imprimirTextoLogo(doc); }
 
             function imprimirTextoLogo(documento) {
                 documento.setTextColor(255, 255, 255);
@@ -184,7 +145,6 @@
             doc.setFontSize(8);
             doc.text("DISTRIBUIDOR AUTORIZADO", 14, 32);
 
-            // TÍTULO DEL COMPROBANTE (DERECHA)
             doc.setFontSize(20);
             doc.setFont("helvetica", "bold");
             doc.text("RECIBO DE COMPRA", 196, 22, { align: "right" });
@@ -194,7 +154,6 @@
             doc.text(`Folio: KRU-${folioNumber}`, 196, 30, { align: "right" });
             doc.text(`Fecha: ${fechaActual}`, 196, 36, { align: "right" });
 
-            // 2. SECCIÓN DE DATOS (CLIENTE Y ENVÍO A DOS COLUMNAS)
             doc.setTextColor(0, 40, 85);
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
@@ -202,13 +161,12 @@
             doc.text("DETALLES DE ENVÍO", 105, 60);
 
             doc.setDrawColor(230, 230, 230);
-            doc.line(14, 63, 85, 63); // Línea debajo de título 1
-            doc.line(105, 63, 196, 63); // Línea debajo de título 2
+            doc.line(14, 63, 85, 63); 
+            doc.line(105, 63, 196, 63); 
 
             doc.setFontSize(10);
             doc.setTextColor(80, 80, 80);
             
-            // Columna Izquierda (Cliente)
             doc.setFont("helvetica", "bold");
             doc.text("Nombre:", 14, 70);
             doc.setFont("helvetica", "normal");
@@ -229,34 +187,29 @@
             doc.setFont("helvetica", "normal");
             doc.text("Aprobado de forma segura vía Clip", 26, 88);
 
-            // Columna Derecha (Envío)
             doc.setFont("helvetica", "bold");
             doc.text("Dirección:", 105, 70);
             doc.setFont("helvetica", "normal");
             
-            // Si la dirección es muy larga, la partimos en dos renglones
             const dirCompleta = doc.splitTextToSize(ordenGuardada.shippingAddress || "No especificada", 70);
             doc.text(dirCompleta, 124, 70);
 
-            let offsetY = 70 + (dirCompleta.length * 5); // Calculamos dónde terminó la dirección
+            let offsetY = 70 + (dirCompleta.length * 5); 
 
             if (ordenGuardada.needsInstall) {
                 doc.setFont("helvetica", "bold");
-                doc.setTextColor(211, 17, 69); // Rojo
+                doc.setTextColor(211, 17, 69); 
                 doc.text("Instalación:", 105, offsetY + 2);
                 doc.setFont("helvetica", "normal");
                 doc.setTextColor(80, 80, 80);
                 doc.text(`Requerida (${ordenGuardada.installSchedule || "Horario a coordinar"})`, 128, offsetY + 2);
             }
 
-            // 3. TABLA DE PRODUCTOS (Generada con AutoTable)
             const columnas = ["Cant.", "Descripción del Producto", "Incluye Instalación", "Importe"];
             const filas = [];
 
             ordenGuardada.items.forEach(item => {
                 const totalItem = (item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity;
-                
-                // Construimos una descripción más detallada
                 let descripcion = item.name;
                 if(item.gasType) descripcion += `\n• Tipo de Gas: ${item.gasType}`;
                 if(item.size) descripcion += `\n• Medida: ${item.size}`;
@@ -285,7 +238,6 @@
                 }
             });
 
-            // 4. DIBUJAR TOTALES (Desglose de IVA)
             const posicionY = doc.lastAutoTable.finalY + 15;
 
             doc.setFontSize(10);
@@ -296,20 +248,18 @@
             doc.text("IVA (16%):", 130, posicionY + 7);
             doc.text(`$${iva.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 196, posicionY + 7, { align: "right" });
 
-            // Línea separadora
             doc.setDrawColor(200, 200, 200);
             doc.line(130, posicionY + 11, 196, posicionY + 11);
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(14);
             doc.text("TOTAL PAGADO:", 130, posicionY + 19);
-            doc.setTextColor(211, 17, 69); // Rojo Krüger
+            doc.setTextColor(211, 17, 69);
             doc.text(`$${total.toLocaleString('es-MX')} MXN`, 196, posicionY + 19, { align: "right" });
 
-            // 5. CAJA DE TÉRMINOS Y CONDICIONES
             doc.setFillColor(248, 249, 250);
             doc.setDrawColor(230, 230, 230);
-            doc.roundedRect(14, posicionY + 30, 182, 35, 3, 3, 'FD'); // Caja de información
+            doc.roundedRect(14, posicionY + 30, 182, 35, 3, 3, 'FD'); 
             
             doc.setTextColor(0, 40, 85);
             doc.setFontSize(9);
@@ -324,12 +274,10 @@
             doc.text("• Si solicitaste instalación, nuestros técnicos certificados se coordinarán para realizar la visita.", 18, posicionY + 54);
             doc.text("• Dudas y soporte: krugerdistribudorautorizado@gmail.com", 18, posicionY + 59);
 
-            // PIE DE PÁGINA
             doc.setTextColor(180, 180, 180);
             doc.setFontSize(8);
             doc.text("Ingeniería Alemana | Calidad Absoluta | krüger", 105, 285, { align: "center" });
 
-            // DESCARGAR EL ARCHIVO PDF
             doc.save(`Recibo_Kruger_${folioNumber}.pdf`);
         }
     </script>
