@@ -474,7 +474,7 @@
 
             const totalAmount = cart.reduce((s, i) => s + ((i.price + (i.wantsInstall?i.installPrice:0)) * i.quantity), 0);
 
-            // Estructura completa de la orden (Con status "Pagado" para que el admin la muestre de inmediato)
+            // Estructura completa de la orden: nace como Pendiente de Pago
             const orderData = {
                 customerName: document.getElementById('c-name').value,
                 customerPhone: document.getElementById('c-phone').value,
@@ -490,11 +490,11 @@
             };
 
             try {
-                // 1. GUARDAR EN FIREBASE DE INMEDIATO CON TODOS LOS DATOS
+                // 1. GUARDAR EN FIREBASE DE INMEDIATO
                 const nuevaOrdenRef = await addDoc(collection(db, "orders"), orderData);
                 const orderId = nuevaOrdenRef.id;
 
-                // 2. LLAMAR AL SERVIDOR DE RENDER PARA GENERAR EL LINK DE CLIP PASANDO EL orderId
+                // 2. LLAMAR AL SERVIDOR DE RENDER PASANDO EL orderId
                 const response = await fetch("https://servidor-kruger.onrender.com/crear-pago-clip", {
                     method: "POST", 
                     headers: { "Content-Type": "application/json" }, 
@@ -510,6 +510,9 @@
                 const data = await response.json();
 
                 if (data.checkoutUrl) {
+                    // GUARDAMOS LA ORDEN EN LOCALSTORAGE PARA QUE LA PÁGINA DE ÉXITO (success.html) PUEDA GENERAR EL PDF
+                    localStorage.setItem("ordenKruger", JSON.stringify(orderData));
+                    
                     window.location.href = data.checkoutUrl; // Redirige a Clip de forma segura
                 } else {
                     alert("Error de Clip al generar el enlace de pago. Intenta nuevamente.");
