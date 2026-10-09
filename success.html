@@ -3,174 +3,294 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Krüger | ¡Pago Exitoso!</title>
-    <link rel="icon" type="image/ico" href="./kru.ico">
+    <title>¡Pago Exitoso! | Tienda Krüger</title>
+    
+    <!-- Tailwind y Fuentes -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&display=swap" rel="stylesheet">
     
-    <!-- Librería para crear el PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <!-- LIBRERÍAS PROFESIONALES PARA GENERAR PDF NATIVO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
     <script>
         tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Outfit', 'sans-serif'], },
-                    colors: { 'metallic-blue': '#002855', 'metallic-red': '#D31145', 'metallic-silver': '#E8ECEF' }
-                }
-            }
+            theme: { extend: { fontFamily: { sans: ['Outfit', 'sans-serif'] }, colors: { 'metallic-blue': '#002855', 'metallic-red': '#D31145' } } }
         }
     </script>
-    <style>body { font-family: 'Outfit', sans-serif; background-color: #F8F9FA; }</style>
+    <style>
+        body { font-family: 'Outfit', sans-serif; }
+        .path-check {
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            animation: drawCheck 0.6s ease-out forwards;
+            animation-delay: 0.2s;
+        }
+        @keyframes drawCheck { to { stroke-dashoffset: 0; } }
+    </style>
+
+    <!-- SCRIPT LIMPIO: SOLO LEE EL MONTO Y VACÍA EL CARRITO -->
+    <script>
+        // Si la abrieron dentro de un Iframe, obligamos a que se haga pantalla completa
+        if (window !== window.top) { window.top.location = window.location; }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const ordenGuardada = JSON.parse(localStorage.getItem("ordenKruger"));
+            
+            if (ordenGuardada) {
+                document.getElementById('monto-total').innerText = `$${ordenGuardada.total.toLocaleString('es-MX')} MXN`;
+                // Vaciamos el carrito para que no lo vuelvan a comprar por error
+                localStorage.removeItem("krugerCart");
+            } else {
+                document.getElementById('monto-total').innerText = "Orden no encontrada";
+            }
+        });
+    </script>
+
 </head>
-<body class="bg-[#F8F9FA] text-gray-800 antialiased min-h-screen flex flex-col items-center justify-center py-10 px-4">
+<body class="bg-[#F8F9FA] flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="max-w-3xl w-full">
-        <!-- AVISO DE SPAM Y CORREO OFICIAL -->
-        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-5 mb-6 rounded-r-2xl shadow-sm animate-pulse" data-html2canvas-ignore="true">
-            <div class="flex items-start">
-                <div class="flex-shrink-0 mt-0.5"><i class="fas fa-envelope-open-text text-yellow-500 text-2xl"></i></div>
-                <div class="ml-4">
-                    <h3 class="text-base font-black text-yellow-800 tracking-wide uppercase">Recibo Oficial Enviado</h3>
-                    <div class="mt-1 text-sm text-yellow-700 font-medium">
-                        <p>Te hemos enviado un correo con tu nota de compra oficial. <strong>Por favor, revisa tu bandeja de Spam o Correo No Deseado</strong> si no lo ves en tu bandeja principal en los próximos minutos.</p>
-                    </div>
-                </div>
-            </div>
+    <!-- IMAGEN OCULTA EXCLUSIVA PARA EL PDF -->
+    <img id="logo-blanco-pdf" src="./kruger.png" style="display:none;" crossorigin="anonymous">
+
+    <!-- CONTENEDOR PRINCIPAL QUE AGRUPA EL AVISO Y LA TARJETA -->
+    <div class="max-w-lg w-full">
+        
+        <!-- AVISO DE SPAM (AGREGADO) -->
+        <div style="background-color: #fefce8; border-left: 4px solid #facc15; padding: 15px; margin-bottom: 20px; border-radius: 0 10px 10px 0; font-family: sans-serif;">
+            <h3 style="margin: 0 0 5px 0; color: #854d0e; font-size: 16px;">Recibo Oficial Enviado</h3>
+            <p style="margin: 0; color: #a16207; font-size: 14px;">
+                Te hemos enviado tu nota de compra oficial. <strong>Por favor, revisa tu bandeja de Spam o Correo No Deseado</strong>.
+            </p>
         </div>
 
-        <!-- CONTENEDOR DEL RECIBO / PDF -->
-        <div id="recibo-pdf" class="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
+        <!-- TARJETA DE ÉXITO -->
+        <div class="bg-white rounded-3xl shadow-[0_20px_50px_rgba(0,40,85,0.1)] p-8 md:p-12 w-full text-center border border-gray-100 relative overflow-hidden">
             
-            <div class="bg-metallic-blue p-8 md:p-10 text-center relative overflow-hidden">
-                <div class="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/brushed-alum.png')]"></div>
-                <!-- Aquí también actualicé tu logo a kruger.png por si acaso -->
-                <img src="./kruger.png" alt="Krüger" class="h-12 mx-auto relative z-10 mb-6" onerror="this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
-                <div class="w-20 h-20 mx-auto bg-green-500 rounded-full flex items-center justify-center text-white text-4xl shadow-lg relative z-10 mb-4">
-                    <i class="fas fa-check"></i>
-                </div>
-                <h1 class="text-3xl md:text-4xl font-black text-white relative z-10">¡Pago Aprobado!</h1>
-                <p class="text-blue-200 mt-2 text-lg relative z-10">Gracias por confiar en Tecnología Krüger</p>
-            </div>
+            <!-- Decoración de fondo -->
+            <div class="absolute -top-10 -right-10 w-40 h-40 bg-green-400 rounded-full opacity-10 blur-3xl"></div>
+            <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-[#ff5a00] rounded-full opacity-10 blur-3xl"></div>
 
-            <div class="p-8 md:p-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                    <div>
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b pb-2">Datos del Cliente</h3>
-                        <p class="font-bold text-gray-800 text-lg" id="r-name">Cargando...</p>
-                        <p class="text-gray-600 mt-1" id="r-email"></p>
-                        <p class="text-gray-600" id="r-phone"></p>
-                    </div>
-                    <div>
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 border-b pb-2">Datos de Envío</h3>
-                        <p class="text-gray-800 font-medium" id="r-address">Cargando...</p>
-                    </div>
+            <div class="relative z-10">
+                
+                <div class="mb-6 flex flex-col items-center border-b border-gray-100 pb-6">
+                    <img id="logo-img" src="./kruger.png" alt="Krüger" class="h-10 md:h-12 w-auto object-contain" onerror="this.onerror=null; this.src='https://placehold.co/240x60/transparent/002855?text=Krüger';">
+                    <span class="text-[10px] uppercase tracking-widest text-gray-500 font-bold mt-2">Distribuidor Autorizado</span>
                 </div>
-
-                <div id="r-install-container" class="hidden bg-red-50 p-4 rounded-xl border border-red-100 mb-8">
-                    <h3 class="text-xs font-bold text-metallic-red uppercase tracking-widest mb-2"><i class="fas fa-tools mr-1"></i> Cita de Instalación (León, Gto)</h3>
-                    <p class="text-gray-800 text-sm"><strong class="font-bold">Lugar:</strong> <span id="r-install-address"></span></p>
-                    <p class="text-gray-800 text-sm mt-1"><strong class="font-bold">Horario:</strong> <span id="r-install-schedule"></span></p>
+                
+                <div class="w-24 h-24 bg-gradient-to-tr from-green-400 to-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30 transform hover:scale-105 transition-transform">
+                    <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path class="path-check" stroke-linecap="round" stroke-linejoin="round" stroke-width="4" d="M5 13l4 4L19 7"></path>
+                    </svg>
                 </div>
-
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 border-b pb-2">Resumen de Productos</h3>
-                <div id="r-items" class="space-y-4 mb-8">
-                    <!-- Los items se inyectan aquí -->
-                </div>
-
-                <div class="border-t-2 border-dashed border-gray-200 pt-6 flex justify-between items-end">
-                    <span class="text-gray-500 font-bold uppercase tracking-widest">Total Pagado</span>
-                    <div class="text-right">
-                        <span class="text-4xl font-black text-metallic-blue" id="r-total">$0.00</span>
-                        <span class="text-sm font-bold text-gray-400 uppercase">MXN</span>
+                
+                <h1 class="text-3xl font-black text-metallic-blue mb-2">¡Pago Autorizado!</h1>
+                <p class="text-gray-500 mb-8 text-sm">Tu transacción ha sido procesada de forma 100% segura por <strong>Clip</strong>. Tu pedido ya está en nuestro sistema para ser enviado.</p>
+                
+                <div class="bg-gray-50/80 rounded-2xl p-6 mb-8 border border-gray-100 flex flex-col items-center">
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total Pagado</p>
+                    <p class="text-4xl font-black text-gray-900" id="monto-total">Calculando...</p>
+                    <div class="mt-3 bg-white px-3 py-1 rounded-full border border-gray-200 text-xs font-bold text-[#ff5a00] flex items-center gap-1">
+                        <i class="fas fa-lock"></i> Pago Blindado por Clip
                     </div>
                 </div>
-            </div>
-            
-            <div class="bg-gray-50 p-6 text-center text-xs text-gray-500 border-t border-gray-100">
-                Krüger Distribuidor Autorizado | Documento generado automáticamente | En breve nos comunicaremos contigo.
-            </div>
-        </div>
 
-        <!-- BOTONES DE ACCIÓN (NO SE IMPRIMEN EN EL PDF) -->
-        <div class="mt-8 flex flex-col sm:flex-row gap-4 justify-center" data-html2canvas-ignore="true">
-            <button onclick="descargarPDF()" class="bg-metallic-red hover:bg-red-700 text-white font-bold py-4 px-8 rounded-2xl shadow-lg transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 w-full sm:w-auto">
-                <i class="fas fa-file-pdf text-xl"></i> Descargar Nota en PDF
-            </button>
-            <button onclick="volverTienda()" class="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold py-4 px-8 rounded-2xl shadow-sm transition-transform transform hover:-translate-y-1 flex items-center justify-center gap-2 w-full sm:w-auto">
-                <i class="fas fa-home"></i> Volver a la Tienda
-            </button>
+                <div class="flex flex-col gap-4">
+                    <!-- BOTÓN PARA GENERAR PDF NATIVO -->
+                    <button onclick="generarPDF()" class="w-full bg-metallic-blue hover:bg-blue-900 text-white font-bold py-4 rounded-2xl text-lg transition-all shadow-lg shadow-blue-900/20 transform hover:-translate-y-1 flex justify-center items-center gap-3">
+                        <i class="fas fa-file-invoice text-xl"></i> Descargar Comprobante (PDF)
+                    </button>
+                    
+                    <a href="https://krugermx-web.github.io/KrugerDistribuidora/" class="w-full bg-white border-2 border-gray-200 hover:border-metallic-blue hover:text-metallic-blue text-gray-600 font-bold py-4 rounded-2xl text-lg transition-all flex justify-center items-center gap-2 mt-2">
+                        <i class="fas fa-home"></i> Volver a la Tienda
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
+    <!-- SCRIPT DE GENERACIÓN DE PDF PREMIUM -->
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            // Limpiamos el carrito porque ya pagó
-            localStorage.removeItem('krugerCart');
+        function generarPDF() {
+            const ordenGuardada = JSON.parse(localStorage.getItem("ordenKruger"));
 
-            // Leemos la orden
-            const ordenRaw = localStorage.getItem("ordenKruger");
-            if(ordenRaw) {
-                const orden = JSON.parse(ordenRaw);
-                
-                document.getElementById('r-name').innerText = orden.customerName || 'Cliente';
-                document.getElementById('r-email').innerText = orden.customerEmail || '';
-                document.getElementById('r-phone').innerText = orden.customerPhone || '';
-                document.getElementById('r-address').innerText = orden.shippingAddress || '';
-                document.getElementById('r-total').innerText = '$' + (orden.total || 0).toLocaleString('es-MX');
-
-                if(orden.needsInstall) {
-                    document.getElementById('r-install-container').classList.remove('hidden');
-                    document.getElementById('r-install-address').innerText = orden.installAddress || orden.shippingAddress;
-                    document.getElementById('r-install-schedule').innerText = orden.installSchedule ? new Date(orden.installSchedule).toLocaleString('es-MX') : 'Pendiente de agendar';
-                }
-
-                const itemsContainer = document.getElementById('r-items');
-                if(orden.items && orden.items.length > 0) {
-                    itemsContainer.innerHTML = orden.items.map(item => {
-                        let extras = [];
-                        if(item.gasType) extras.push(`<span class="bg-orange-100 text-orange-700 px-2 py-0.5 rounded text-xs"><i class="fas fa-fire mr-1"></i>${item.gasType}</span>`);
-                        if(item.size) extras.push(`<span class="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs"><i class="fas fa-ruler mr-1"></i>${item.size}</span>`);
-                        
-                        let extraPrice = item.wantsInstall ? `<div class="text-xs font-bold text-metallic-red mt-1">+ Inst. $${item.installPrice.toLocaleString('es-MX')}</div>` : '';
-                        
-                        return `
-                        <div class="flex justify-between items-center bg-gray-50 p-4 rounded-xl border border-gray-100">
-                            <div>
-                                <h4 class="font-bold text-gray-800">${item.quantity}x ${item.name}</h4>
-                                <div class="flex gap-2 mt-2">${extras.join('')}</div>
-                                ${extraPrice}
-                            </div>
-                            <div class="text-lg font-black text-gray-900">
-                                $${((item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity).toLocaleString('es-MX')}
-                            </div>
-                        </div>
-                        `;
-                    }).join('');
-                }
-            } else {
-                document.getElementById('r-items').innerHTML = "<p class='text-red-500'>No se encontraron los datos de la orden.</p>";
+            if (!ordenGuardada || !ordenGuardada.items) {
+                alert("No se encontraron los detalles de la orden en la memoria.");
+                return;
             }
-        });
 
-        // FUNCION ORIGINAL PARA EL PDF
-        function descargarPDF() {
-            const elemento = document.getElementById('recibo-pdf');
-            const opciones = {
-                margin:       0,
-                filename:     'Recibo_Kruger.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const total = ordenGuardada.total;
+            const subtotal = total / 1.16;
+            const iva = total - subtotal;
+            const folioNumber = Math.floor(Math.random() * 900000) + 100000;
+            const fechaActual = new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+            doc.setFillColor(0, 40, 85); 
+            doc.rect(0, 0, 210, 45, 'F'); 
+
+            const logoPdf = document.getElementById('logo-blanco-pdf');
+            if (logoPdf && logoPdf.complete && logoPdf.naturalWidth > 0) {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = logoPdf.naturalWidth;
+                    canvas.height = logoPdf.naturalHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(logoPdf, 0, 0);
+                    const imgData = canvas.toDataURL('image/png');
+                    doc.addImage(imgData, 'PNG', 14, 12, 38, 12);
+                } catch(e) { imprimirTextoLogo(doc); }
+            } else { imprimirTextoLogo(doc); }
+
+            function imprimirTextoLogo(documento) {
+                documento.setTextColor(255, 255, 255);
+                documento.setFont("helvetica", "bold");
+                documento.setFontSize(24);
+                documento.text("KRÜGER", 14, 25);
+            }
             
-            // Genera y descarga el PDF tal como lo tenías
-            html2pdf().set(opciones).from(elemento).save();
-        }
+            doc.setTextColor(255, 255, 255);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8);
+            doc.text("DISTRIBUIDOR AUTORIZADO", 14, 32);
 
-        function volverTienda() {
-            window.location.href = './index.html';
+            doc.setFontSize(20);
+            doc.setFont("helvetica", "bold");
+            doc.text("RECIBO DE COMPRA", 196, 22, { align: "right" });
+            
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Folio: KRU-${folioNumber}`, 196, 30, { align: "right" });
+            doc.text(`Fecha: ${fechaActual}`, 196, 36, { align: "right" });
+
+            doc.setTextColor(0, 40, 85);
+            doc.setFontSize(12);
+            doc.setFont("helvetica", "bold");
+            doc.text("DATOS DEL CLIENTE", 14, 60);
+            doc.text("DETALLES DE ENVÍO", 105, 60);
+
+            doc.setDrawColor(230, 230, 230);
+            doc.line(14, 63, 85, 63); 
+            doc.line(105, 63, 196, 63); 
+
+            doc.setFontSize(10);
+            doc.setTextColor(80, 80, 80);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text("Nombre:", 14, 70);
+            doc.setFont("helvetica", "normal");
+            doc.text(ordenGuardada.customerName || "No especificado", 30, 70);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Email:", 14, 76);
+            doc.setFont("helvetica", "normal");
+            doc.text(ordenGuardada.customerEmail || ordenGuardada.email || "No especificado", 27, 76);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Teléfono:", 14, 82);
+            doc.setFont("helvetica", "normal");
+            doc.text(ordenGuardada.customerPhone || "No especificado", 31, 82);
+            
+            doc.setFont("helvetica", "bold");
+            doc.text("Pago:", 14, 88);
+            doc.setFont("helvetica", "normal");
+            doc.text("Aprobado de forma segura vía Clip", 26, 88);
+
+            doc.setFont("helvetica", "bold");
+            doc.text("Dirección:", 105, 70);
+            doc.setFont("helvetica", "normal");
+            
+            const dirCompleta = doc.splitTextToSize(ordenGuardada.shippingAddress || "No especificada", 70);
+            doc.text(dirCompleta, 124, 70);
+
+            let offsetY = 70 + (dirCompleta.length * 5); 
+
+            if (ordenGuardada.needsInstall) {
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(211, 17, 69); 
+                doc.text("Instalación:", 105, offsetY + 2);
+                doc.setFont("helvetica", "normal");
+                doc.setTextColor(80, 80, 80);
+                doc.text(`Requerida (${ordenGuardada.installSchedule || "Horario a coordinar"})`, 128, offsetY + 2);
+            }
+
+            const columnas = ["Cant.", "Descripción del Producto", "Incluye Instalación", "Importe"];
+            const filas = [];
+
+            ordenGuardada.items.forEach(item => {
+                const totalItem = (item.price + (item.wantsInstall ? item.installPrice : 0)) * item.quantity;
+                let descripcion = item.name;
+                if(item.gasType) descripcion += `\n• Tipo de Gas: ${item.gasType}`;
+                if(item.size) descripcion += `\n• Medida: ${item.size}`;
+
+                filas.push([
+                    item.quantity.toString(),
+                    descripcion,
+                    item.wantsInstall ? `Sí (+$${item.installPrice.toLocaleString('es-MX')})` : "-",
+                    `$${totalItem.toLocaleString('es-MX')}`
+                ]);
+            });
+
+            doc.autoTable({
+                startY: 105,
+                head: [columnas],
+                body: filas,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 40, 85], textColor: 255, fontStyle: 'bold', halign: 'center' },
+                bodyStyles: { textColor: 50 },
+                styles: { fontSize: 9, cellPadding: 4, valign: 'middle' },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 15 },
+                    1: { cellWidth: 100 },
+                    2: { halign: 'center', cellWidth: 40 },
+                    3: { halign: 'right', cellWidth: 27 }
+                }
+            });
+
+            const posicionY = doc.lastAutoTable.finalY + 15;
+
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "normal");
+            doc.text("Subtotal (Sin IVA):", 130, posicionY);
+            doc.text(`$${subtotal.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 196, posicionY, { align: "right" });
+
+            doc.text("IVA (16%):", 130, posicionY + 7);
+            doc.text(`$${iva.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`, 196, posicionY + 7, { align: "right" });
+
+            doc.setDrawColor(200, 200, 200);
+            doc.line(130, posicionY + 11, 196, posicionY + 11);
+
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(14);
+            doc.text("TOTAL PAGADO:", 130, posicionY + 19);
+            doc.setTextColor(211, 17, 69);
+            doc.text(`$${total.toLocaleString('es-MX')} MXN`, 196, posicionY + 19, { align: "right" });
+
+            doc.setFillColor(248, 249, 250);
+            doc.setDrawColor(230, 230, 230);
+            doc.roundedRect(14, posicionY + 30, 182, 35, 3, 3, 'FD'); 
+            
+            doc.setTextColor(0, 40, 85);
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.text("Información Importante:", 18, posicionY + 37);
+            
+            doc.setTextColor(100, 100, 100);
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.text("• Tu pago ha sido procesado de manera segura. Este documento sirve como comprobante de tu orden.", 18, posicionY + 44);
+            doc.text("• Nos pondremos en contacto contigo vía telefónica o correo para confirmar el día exacto de entrega.", 18, posicionY + 49);
+            doc.text("• Si solicitaste instalación, nuestros técnicos certificados se coordinarán para realizar la visita.", 18, posicionY + 54);
+            doc.text("• Dudas y soporte: krugerdistribudorautorizado@gmail.com", 18, posicionY + 59);
+
+            doc.setTextColor(180, 180, 180);
+            doc.setFontSize(8);
+            doc.text("Ingeniería Alemana | Calidad Absoluta | krüger", 105, 285, { align: "center" });
+
+            doc.save(`Recibo_Kruger_${folioNumber}.pdf`);
         }
     </script>
 </body>
